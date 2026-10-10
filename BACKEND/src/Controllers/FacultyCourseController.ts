@@ -52,27 +52,27 @@ export const getCourses = async (req: Request, res: Response) => {
     );
 
     const codesWithAlt = new Set<string>(
-      courses.filter((c) => c.Course_Name_Alt).map((c) => c.Course_Code),
+      courses.filter((c) => c.course_name_alt).map((c) => c.course_code),
     );
 
     const visibleCourses = courses.filter((c) => {
-      if (codesWithAlt.has(c.Course_Code) && !c.Course_Name_Alt) return false;
+      if (codesWithAlt.has(c.course_code) && !c.course_name_alt) return false;
       return true;
     });
 
     const rows = await Promise.all(
       visibleCourses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.Course_Id);
+        const { skills, competencies } = await getCourseMappings(c.course_id);
         const completion =
           skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
 
         return {
-          id: c.Course_Id,
-          course: c.Course_Code,
-          courseName: c.Course_Name,
-          altName: c.Course_Name_Alt ?? null,
-          major: c.Major,
-          professor: c.Professor ?? "",
+          id: c.course_id,
+          course: c.course_code,
+          courseName: c.course_name,
+          altName: c.course_name_alt ?? null,
+          major: c.major,
+          professor: c.professor ?? "",
           completion,
           skills,
           competencies,
@@ -111,7 +111,7 @@ export const getCourseMapping = async (req: Request, res: Response) => {
       facultyId,
       facultyFullName,
     );
-    const visibleIds = new Set(visibleCourses.map((c) => c.Course_Id));
+    const visibleIds = new Set(visibleCourses.map((c) => c.course_id));
 
     if (!visibleIds.has(courseId)) {
       return res
@@ -151,7 +151,7 @@ export const updateCourseMapping = async (
       facultyId,
       facultyFullName,
     );
-    const visibleIds = new Set(visibleCourses.map((c) => c.Course_Id));
+    const visibleIds = new Set(visibleCourses.map((c) => c.course_id));
 
     if (!visibleIds.has(courseId)) {
       return res
@@ -172,13 +172,13 @@ export const updateCourseMapping = async (
 
     const pairedCourses = await findPairedCoursesByCodeAndProfessor(
       courseId,
-      existingCourse.Course_Code,
-      existingCourse.Major,
-      existingCourse.Professor ?? "",
+      existingCourse.course_code,
+      existingCourse.major,
+      existingCourse.professor ?? "",
     );
 
     const syncedVisibleCourseIds = pairedCourses
-      .map((c) => c.Course_Id)
+      .map((c) => c.course_id)
       .filter((id) => visibleIds.has(id));
 
     const allCourseIdsToReplace = [courseId, ...syncedVisibleCourseIds];
@@ -213,7 +213,7 @@ export const claimCourse = async (req: Request, res: Response) => {
 
     const unassignedCourses = await getUnassignedCourses();
     const isUnassigned = unassignedCourses.some(
-      (c) => c.Course_Id === courseId,
+      (c) => c.course_id === courseId,
     );
 
     if (!isUnassigned) {
@@ -241,17 +241,17 @@ export const fetchUnassignedCourses = async (req: Request, res: Response) => {
 
     const rows = await Promise.all(
       courses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.Course_Id);
+        const { skills, competencies } = await getCourseMappings(c.course_id);
         const completion =
           skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
 
         return {
-          id: c.Course_Id,
-          course: c.Course_Code,
-          courseName: c.Course_Name,
-          altName: c.Course_Name_Alt ?? null,
-          major: c.Major,
-          professor: c.Professor ?? "",
+          id: c.course_id,
+          course: c.course_code,
+          courseName: c.course_name,
+          altName: c.course_name_alt ?? null,
+          major: c.major,
+          professor: c.professor ?? "",
           completion,
           skills,
           competencies,
@@ -300,11 +300,11 @@ export const checkCourseCode = async (req: Request, res: Response) => {
     res.json({
       exists: matches.length > 0,
       matches: matches.map((m) => ({
-        courseId: m.Course_Id,
-        courseCode: m.Course_Code,
-        courseName: m.Course_Name,
-        alternateCourseTitle: m.Course_Name_Alt ?? "",
-        major: m.Major,
+        courseId: m.course_id,
+        courseCode: m.course_code,
+        courseName: m.course_name,
+        alternateCourseTitle: m.course_name_alt ?? "",
+        major: m.major,
       })),
     });
   } catch (e: unknown) {
@@ -394,10 +394,10 @@ export const createNewCourse = async (
     });
 
     if (allMappingIds.length > 0) {
-      await replaceCourseMappings(Number(newCourse.Course_Id), allMappingIds);
+      await replaceCourseMappings(Number(newCourse.course_id), allMappingIds);
     }
 
-    const mapping = await getCourseMappings(Number(newCourse.Course_Id));
+    const mapping = await getCourseMappings(Number(newCourse.course_id));
 
     res.status(201).json({
       course: newCourse,

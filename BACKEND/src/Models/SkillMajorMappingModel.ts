@@ -1,17 +1,18 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { toSkillRow } from "./SkillsModel.js";
 
 export async function getSkillIdsForMajor(majorId: number): Promise<number[]> {
   const { data, error } = await supabase
-    .from("Skill_Major_Mapping")
-    .select("Skill_id")
-    .eq("Major_id", majorId);
+    .from("skill_major_mapping")
+    .select("skill_id")
+    .eq("major_id", majorId);
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r: any) => r.Skill_id);
+  return (data ?? []).map((r: any) => r.skill_id);
 }
 
 /**
- * Returns Skills rows for a major (joined through Skill_Major_Mapping).
+ * Returns skills rows for a major (joined through skill_major_mapping).
  * Adds majorMatch: true.
  */
 export async function getSkillsForMajor(majorId: number): Promise<
@@ -23,21 +24,16 @@ export async function getSkillsForMajor(majorId: number): Promise<
   }>
 > {
   const { data, error } = await supabase
-    .from("Skill_Major_Mapping")
-    .select("Skill_id, Skills(Skill_Id, Skill_name, Type)")
-    .eq("Major_id", majorId);
+    .from("skill_major_mapping")
+    .select("skill_id, skills(skill_id, skill_name, type)")
+    .eq("major_id", majorId);
 
   if (error) throw new Error(error.message);
 
   const flattened = (data ?? [])
-    .map((row: any) => row.Skills)
+    .map((row: any) => row.skills)
     .filter(Boolean)
-    .map((s: any) => ({
-      Skill_Id: s.Skill_Id,
-      Skill_name: s.Skill_name,
-      Type: s.Type,
-      majorMatch: true,
-    }));
+    .map((s: any) => ({ ...toSkillRow(s), majorMatch: true }));
 
   // dedup safety
   const seen = new Set<number>();
@@ -50,9 +46,9 @@ export async function getSkillsForMajor(majorId: number): Promise<
 
 export async function linkSkillToMajor(skillId: number, majorId: number) {
   const { error } = await supabase
-    .from("Skill_Major_Mapping")
-    .upsert([{ Skill_id: skillId, Major_id: majorId }], {
-      onConflict: "Skill_id,Major_id",
+    .from("skill_major_mapping")
+    .upsert([{ skill_id: skillId, major_id: majorId }], {
+      onConflict: "skill_id,major_id",
     });
 
   if (error) throw new Error(error.message);

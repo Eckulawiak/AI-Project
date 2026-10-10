@@ -21,17 +21,17 @@ export const login = async (req: Request, res: Response) => {
 
   // Check Student table
   const student = await findStudentByEmail(fullEmail);
-  if (student && (await verifyPassword(password, student.Password))) {
+  if (student && (await verifyPassword(password, student.password))) {
     const token = signToken({
-      userId: student.Student_Id,
+      userId: student.student_id,
       userType: "Student",
-      userEmail: student.Student_Qu_Email,
+      userEmail: student.student_qu_email,
     });
 
     try {
-      await supabase.from("AuditLogs").insert({
-        user_id: student.Student_Id,
-        email: student.Student_Qu_Email || fullEmail,
+      await supabase.from("auditlogs").insert({
+        user_id: student.student_id,
+        email: student.student_qu_email || fullEmail,
         user_type: "STUDENT",
         action: "LOGIN",
       });
@@ -44,20 +44,20 @@ export const login = async (req: Request, res: Response) => {
 
   // Check Faculty table
   const faculty = await findFacultyByEmail(fullEmail);
-  if (faculty && (await verifyPassword(password, faculty.Password))) {
+  if (faculty && (await verifyPassword(password, faculty.password))) {
     const userTypeStr =
-      faculty.Type === true ? "Administrator" : "Faculty/Administrator";
+      faculty.type === true ? "Administrator" : "Faculty/Administrator";
     const token = signToken({
-      userId: faculty.Faculty_Id,
+      userId: faculty.faculty_id,
       userType: userTypeStr,
       userEmail: fullEmail,
     });
 
     try {
-      await supabase.from("AuditLogs").insert({
-        user_id: faculty.Faculty_Id,
+      await supabase.from("auditlogs").insert({
+        user_id: faculty.faculty_id,
         email: fullEmail,
-        user_type: faculty.Type === true ? "ADMIN" : "FACULTY",
+        user_type: faculty.type === true ? "ADMIN" : "FACULTY",
         action: "LOGIN",
       });
     } catch (auditError) {
@@ -74,7 +74,7 @@ export const logout = async (req: Request, res: Response) => {
   const { user_id, email, user_type } = req.body;
   if (user_id && email && user_type) {
     try {
-      await supabase.from("AuditLogs").insert({
+      await supabase.from("auditlogs").insert({
         user_id,
         email,
         user_type,
@@ -111,9 +111,9 @@ export const register = async (req: Request, res: Response) => {
 
   if (userType === "Student") {
     const { data: existing } = await supabase
-      .from("Student")
-      .select("Student_Id")
-      .eq("Student_Qu_Email", fullEmail)
+      .from("student")
+      .select("student_id")
+      .eq("student_qu_email", fullEmail)
       .single();
 
     if (existing)
@@ -122,13 +122,13 @@ export const register = async (req: Request, res: Response) => {
         .json({ error: "An account with this email already exists" });
 
     const { data, error } = await supabase
-      .from("Student")
+      .from("student")
       .insert({
-        Student_Qu_Email: fullEmail,
-        Password: hashedPassword,
-        FirstName: firstName,
-        LastName: lastName,
-        Major: major,
+        student_qu_email: fullEmail,
+        password: hashedPassword,
+        firstname: firstName,
+        lastname: lastName,
+        major: major,
       })
       .select()
       .single();
@@ -136,23 +136,23 @@ export const register = async (req: Request, res: Response) => {
     if (error) return res.status(500).json({ error: error.message });
 
     const token = signToken({
-      userId: data.Student_Id,
+      userId: data.student_id,
       userType: "Student",
-      userEmail: data.Student_Qu_Email,
+      userEmail: data.student_qu_email,
     });
     return res
       .status(201)
       .json({
         token,
-        userId: data.Student_Id,
+        userId: data.student_id,
         userType: "Student",
-        userEmail: data.Student_Qu_Email,
+        userEmail: data.student_qu_email,
       });
   } else {
     const { data: existing } = await supabase
-      .from("Faculty_Admin")
-      .select("Faculty_Id")
-      .eq("Faculty_Qu_Email", fullEmail)
+      .from("faculty_admin")
+      .select("faculty_id")
+      .eq("faculty_qu_email", fullEmail)
       .single();
 
     if (existing)
@@ -161,13 +161,13 @@ export const register = async (req: Request, res: Response) => {
         .json({ error: "An account with this email already exists" });
 
     const { data, error } = await supabase
-      .from("Faculty_Admin")
+      .from("faculty_admin")
       .insert({
-        Faculty_Qu_Email: fullEmail,
-        Password: hashedPassword,
-        FirstName: firstName,
-        LastName: lastName,
-        Type: false,
+        faculty_qu_email: fullEmail,
+        password: hashedPassword,
+        firstname: firstName,
+        lastname: lastName,
+        type: false,
       })
       .select()
       .single();
@@ -175,17 +175,17 @@ export const register = async (req: Request, res: Response) => {
     if (error) return res.status(500).json({ error: error.message });
 
     const token = signToken({
-      userId: data.Faculty_Id,
+      userId: data.faculty_id,
       userType: "Faculty/Administrator",
-      userEmail: data.Faculty_Qu_Email,
+      userEmail: data.faculty_qu_email,
     });
     return res
       .status(201)
       .json({
         token,
-        userId: data.Faculty_Id,
+        userId: data.faculty_id,
         userType: "Faculty/Administrator",
-        userEmail: data.Faculty_Qu_Email,
+        userEmail: data.faculty_qu_email,
       });
   }
 };
@@ -247,14 +247,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     if (student) {
       await supabase
-        .from("Student")
+        .from("student")
         .update({ reset_code: code, reset_code_expiry: expiry })
-        .eq("Student_Id", student.Student_Id);
+        .eq("student_id", student.student_id);
     } else {
       await supabase
-        .from("Faculty_Admin")
+        .from("faculty_admin")
         .update({ reset_code: code, reset_code_expiry: expiry })
-        .eq("Faculty_Id", faculty!.Faculty_Id);
+        .eq("faculty_id", faculty!.faculty_id);
     }
 
     await sendResetEmail(fullEmail, code);
@@ -325,26 +325,26 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     if (student) {
       await supabase
-        .from("Student")
-        .update({ Password: hashed, reset_code: null, reset_code_expiry: null })
-        .eq("Student_Id", student.Student_Id);
+        .from("student")
+        .update({ password: hashed, reset_code: null, reset_code_expiry: null })
+        .eq("student_id", student.student_id);
       const token = signToken({
-        userId: student.Student_Id,
+        userId: student.student_id,
         userType: "Student",
-        userEmail: student.Student_Qu_Email,
+        userEmail: student.student_qu_email,
       });
       return res.json({ token, userType: "Student" });
     } else {
       await supabase
-        .from("Faculty_Admin")
-        .update({ Password: hashed, reset_code: null, reset_code_expiry: null })
-        .eq("Faculty_Id", faculty!.Faculty_Id);
+        .from("faculty_admin")
+        .update({ password: hashed, reset_code: null, reset_code_expiry: null })
+        .eq("faculty_id", faculty!.faculty_id);
       const userTypeStr =
-        faculty!.Type === true ? "Administrator" : "Faculty/Administrator";
+        faculty!.type === true ? "Administrator" : "Faculty/Administrator";
       const token = signToken({
-        userId: faculty!.Faculty_Id,
+        userId: faculty!.faculty_id,
         userType: userTypeStr,
-        userEmail: faculty!.Faculty_Qu_Email,
+        userEmail: faculty!.faculty_qu_email,
       });
       return res.json({ token, userType: userTypeStr });
     }
@@ -361,30 +361,30 @@ export const getProfile = async (req: Request, res: Response) => {
 
     if (userType === "Student") {
       const { data, error } = await supabase
-        .from("Student")
-        .select("FirstName, LastName, Student_Qu_Email, Major")
-        .eq("Student_Id", userId)
+        .from("student")
+        .select("firstname, lastname, student_qu_email, major")
+        .eq("student_id", userId)
         .single();
       if (error || !data)
         return res.status(404).json({ error: "Student account not found" });
       return res.json({
-        firstName: data.FirstName,
-        lastName: data.LastName,
-        email: data.Student_Qu_Email,
-        major: data.Major,
+        firstName: data.firstname,
+        lastName: data.lastname,
+        email: data.student_qu_email,
+        major: data.major,
       });
     } else {
       const { data, error } = await supabase
-        .from("Faculty_Admin")
-        .select("FirstName, LastName, Faculty_Qu_Email")
-        .eq("Faculty_Id", userId)
+        .from("faculty_admin")
+        .select("firstname, lastname, faculty_qu_email")
+        .eq("faculty_id", userId)
         .single();
       if (error || !data)
         return res.status(404).json({ error: "Faculty account not found" });
       return res.json({
-        firstName: data.FirstName,
-        lastName: data.LastName,
-        email: data.Faculty_Qu_Email,
+        firstName: data.firstname,
+        lastName: data.lastname,
+        email: data.faculty_qu_email,
       });
     }
   } catch (e: unknown) {
@@ -409,23 +409,23 @@ export const updateProfile = async (req: Request, res: Response) => {
     }
 
     const updatePayload: Record<string, any> = {
-      FirstName: firstName.trim(),
-      LastName: lastName.trim(),
+      firstname: firstName.trim(),
+      lastname: lastName.trim(),
     };
-    if (password) updatePayload.Password = await hashPassword(password);
+    if (password) updatePayload.password = await hashPassword(password);
 
     if (userType === "Student") {
-      if (major !== undefined) updatePayload.Major = major.trim();
+      if (major !== undefined) updatePayload.major = major.trim();
       const { error } = await supabase
-        .from("Student")
+        .from("student")
         .update(updatePayload)
-        .eq("Student_Id", userId);
+        .eq("student_id", userId);
       if (error) throw error;
     } else {
       const { error } = await supabase
-        .from("Faculty_Admin")
+        .from("faculty_admin")
         .update(updatePayload)
-        .eq("Faculty_Id", userId);
+        .eq("faculty_id", userId);
       if (error) throw error;
     }
 

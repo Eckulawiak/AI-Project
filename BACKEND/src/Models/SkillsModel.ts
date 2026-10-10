@@ -1,16 +1,26 @@
 import { supabase } from "../Database/supabaseClient.js";
 
+// DB columns are lowercase; the API keeps the { Skill_Id, Skill_name, Type } shape
+export function toSkillRow(row: any) {
+  return {
+    Skill_Id: row.skill_id as number,
+    Skill_name: row.skill_name as string,
+    Type: row.type as boolean,
+  };
+}
+
 export async function getAllSkillsAndCompetencies() {
   const { data, error } = await supabase
-    .from("Skills")
+    .from("skills")
     // Description removed — names only
-    .select("Skill_Id, Skill_name, Type")
-    .order("Skill_name", { ascending: true });
+    .select("skill_id, skill_name, type")
+    .order("skill_name", { ascending: true });
 
   if (error) throw new Error(error.message);
 
-  const skills = (data ?? []).filter((x) => x.Type === false);
-  const competencies = (data ?? []).filter((x) => x.Type === true);
+  const rows = (data ?? []).map(toSkillRow);
+  const skills = rows.filter((x) => x.Type === false);
+  const competencies = rows.filter((x) => x.Type === true);
 
   return { skills, competencies };
 }
@@ -20,14 +30,14 @@ export async function findSkillByName(name: string) {
   const trimmed = name.trim();
 
   const { data, error } = await supabase
-    .from("Skills")
-    .select("Skill_Id, Skill_name, Type")
-    .eq("Type", false)
-    .ilike("Skill_name", trimmed)
+    .from("skills")
+    .select("skill_id, skill_name, type")
+    .eq("type", false)
+    .ilike("skill_name", trimmed)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data ?? null;
+  return data ? toSkillRow(data) : null;
 }
 
 // Create skill using NAME (no Description)
@@ -35,18 +45,18 @@ export async function createSkillWithName(name: string) {
   const trimmed = name.trim();
 
   const { data, error } = await supabase
-    .from("Skills")
+    .from("skills")
     .insert([
       {
-        Skill_name: trimmed,
-        Type: false,
+        skill_name: trimmed,
+        type: false,
       },
     ])
-    .select("Skill_Id, Skill_name, Type")
+    .select("skill_id, skill_name, type")
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return toSkillRow(data);
 }
 
 /**
@@ -55,7 +65,7 @@ export async function createSkillWithName(name: string) {
  */
 export async function deleteSkillById(_skillId: number) {
   throw new Error(
-    "Deleting Skills rows is disabled. Remove skills from a course by updating the Course_Skill_Mapping on Save.",
+    "Deleting Skills rows is disabled. Remove skills from a course by updating the courses_skill_mapping on Save.",
   );
 }
 
@@ -65,13 +75,13 @@ export async function findSkillsByNames(names: string[]) {
   if (trimmed.length === 0) return [];
 
   const { data, error } = await supabase
-    .from("Skills")
-    .select("Skill_Id, Skill_name, Type")
-    .eq("Type", false)
-    .in("Skill_name", trimmed);
+    .from("skills")
+    .select("skill_id, skill_name, type")
+    .eq("type", false)
+    .in("skill_name", trimmed);
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).map(toSkillRow);
 }
 
 export async function findOrCreateSkillByName(name: string) {

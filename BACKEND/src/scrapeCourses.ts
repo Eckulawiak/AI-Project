@@ -44,10 +44,10 @@ async function scrapeSubject(
   slug: string,
 ): Promise<
   {
-    Course_Code: string;
-    Course_Name: string;
-    Professor: string;
-    Major: string;
+    course_code: string;
+    course_name: string;
+    professor: string;
+    major: string;
   }[]
 > {
   const url = `https://catalog.qu.edu/courses-undergraduate/${slug}/`;
@@ -62,10 +62,10 @@ async function scrapeSubject(
   const html = await res.text();
   const $ = cheerio.load(html);
   const courses: {
-    Course_Code: string;
-    Course_Name: string;
-    Professor: string;
-    Major: string;
+    course_code: string;
+    course_name: string;
+    professor: string;
+    major: string;
   }[] = [];
 
   $(".courseblock").each((_i, el) => {
@@ -94,10 +94,10 @@ async function scrapeSubject(
     if (!courseCode || !courseName) return;
 
     courses.push({
-      Course_Code: courseCode,
-      Course_Name: courseName,
-      Professor: "N/A",
-      Major: major,
+      course_code: courseCode,
+      course_name: courseName,
+      professor: "N/A",
+      major: major,
     });
   });
 
@@ -108,10 +108,10 @@ async function scrapeSubject(
 // ── Insert courses into Supabase in batches ───────────────────────────────────
 async function insertCourses(
   courses: {
-    Course_Code: string;
-    Course_Name: string;
-    Professor: string;
-    Major: string;
+    course_code: string;
+    course_name: string;
+    professor: string;
+    major: string;
   }[],
 ) {
   if (courses.length === 0) return;
@@ -121,8 +121,8 @@ async function insertCourses(
   for (let i = 0; i < courses.length; i += CHUNK) {
     const chunk = courses.slice(i, i + CHUNK);
     const { error } = await supabase
-      .from("Courses")
-      .upsert(chunk, { onConflict: "Course_Code" });
+      .from("courses")
+      .upsert(chunk, { onConflict: "course_code" });
     if (error) {
       console.error(`  ✗ Insert error:`, error.message);
     } else {

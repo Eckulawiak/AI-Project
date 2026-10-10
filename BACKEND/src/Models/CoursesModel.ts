@@ -8,12 +8,12 @@ export type CourseUpdates = {
 };
 
 type CourseRow = {
-  Course_Id: number;
-  Course_Code: string;
-  Course_Name: string;
-  Course_Name_Alt?: string | null;
-  Major: string;
-  Professor?: string | null;
+  course_id: number;
+  course_code: string;
+  course_name: string;
+  course_name_alt?: string | null;
+  major: string;
+  professor?: string | null;
 };
 
 function normalizeCourseCode(value: string) {
@@ -44,24 +44,24 @@ function getPairedMajor(major: string) {
 
 export async function getAllCourses() {
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
-    .order("Major", { ascending: true })
-    .order("Course_Code", { ascending: true });
+    .order("major", { ascending: true })
+    .order("course_code", { ascending: true });
 
   if (error) throw error;
   return data ?? [];
 }
 
-// Returns courses grouped by Course_Code within a major.
+// Returns courses grouped by course_code within a major.
 export async function getCoursesByMajor(major: string) {
   const { data, error } = await supabase
-    .from("Courses")
-    .select("Course_Id, Course_Code, Course_Name, Course_Name_Alt")
-    .eq("Major", major)
-    .order("Course_Code", { ascending: true });
+    .from("courses")
+    .select("course_id, course_code, course_name, course_name_alt")
+    .eq("major", major)
+    .order("course_code", { ascending: true });
 
   if (error) throw error;
 
@@ -74,22 +74,22 @@ export async function getCoursesByMajor(major: string) {
   > = {};
 
   for (const row of data ?? []) {
-    const existing = groupMap[row.Course_Code];
+    const existing = groupMap[row.course_code];
 
     if (!existing) {
-      groupMap[row.Course_Code] = {
-        courseName: row.Course_Name ?? row.Course_Code,
+      groupMap[row.course_code] = {
+        courseName: row.course_name ?? row.course_code,
         offerings: [
           {
-            id: String(row.Course_Id),
-            altName: row.Course_Name_Alt ?? null,
+            id: String(row.course_id),
+            altName: row.course_name_alt ?? null,
           },
         ],
       };
     } else {
       existing.offerings.push({
-        id: String(row.Course_Id),
-        altName: row.Course_Name_Alt ?? null,
+        id: String(row.course_id),
+        altName: row.course_name_alt ?? null,
       });
     }
   }
@@ -103,11 +103,11 @@ export async function getCoursesByMajor(major: string) {
 
 export async function getCourseById(courseId: number) {
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
-    .eq("Course_Id", courseId)
+    .eq("course_id", courseId)
     .single();
 
   if (error) throw error;
@@ -118,18 +118,18 @@ export async function updateCourse(courseId: number, updates: CourseUpdates) {
   const payload: Record<string, unknown> = {};
 
   if (updates.courseCode !== undefined)
-    payload.Course_Code = updates.courseCode;
+    payload.course_code = updates.courseCode;
   if (updates.courseName !== undefined)
-    payload.Course_Name = updates.courseName;
-  if (updates.major !== undefined) payload.Major = updates.major;
-  if (updates.professor !== undefined) payload.Professor = updates.professor;
+    payload.course_name = updates.courseName;
+  if (updates.major !== undefined) payload.major = updates.major;
+  if (updates.professor !== undefined) payload.professor = updates.professor;
 
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .update(payload)
-    .eq("Course_Id", courseId)
+    .eq("course_id", courseId)
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
     .single();
 
@@ -152,19 +152,19 @@ export async function findPairedCoursesByCodeAndProfessor(
   const normalizedProfessor = normalizeProfessor(sourceProfessor || "");
 
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
-    .eq("Major", pairedMajor);
+    .eq("major", pairedMajor);
 
   if (error) throw error;
 
   return ((data ?? []) as CourseRow[]).filter((row) => {
-    if (row.Course_Id === sourceCourseId) return false;
+    if (row.course_id === sourceCourseId) return false;
 
-    const rowNumber = extractCourseNumber(row.Course_Code ?? "");
-    const rowProfessor = normalizeProfessor(row.Professor ?? "");
+    const rowNumber = extractCourseNumber(row.course_code ?? "");
+    const rowProfessor = normalizeProfessor(row.professor ?? "");
 
     return rowNumber === sourceNumber && rowProfessor === normalizedProfessor;
   });
@@ -190,19 +190,19 @@ export async function updateCrossMajorMatchingCoursesByCodeAndProfessor(
 
   // keep each row's own code + major
   if (updates.courseName !== undefined)
-    payload.Course_Name = updates.courseName;
-  if (updates.professor !== undefined) payload.Professor = updates.professor;
+    payload.course_name = updates.courseName;
+  if (updates.professor !== undefined) payload.professor = updates.professor;
 
   if (Object.keys(payload).length === 0) return matches;
 
-  const ids = matches.map((row) => row.Course_Id);
+  const ids = matches.map((row) => row.course_id);
 
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .update(payload)
-    .in("Course_Id", ids)
+    .in("course_id", ids)
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     );
 
   if (error) throw error;
@@ -213,15 +213,15 @@ export async function findCoursesByCode(courseCode: string) {
   const normalizedCode = normalizeCourseCode(courseCode);
 
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     );
 
   if (error) throw error;
 
   return (data ?? []).filter(
-    (row) => normalizeCourseCode(row.Course_Code ?? "") === normalizedCode,
+    (row) => normalizeCourseCode(row.course_code ?? "") === normalizedCode,
   );
 }
 
@@ -233,18 +233,18 @@ export async function createCourse(input: {
   professor?: string;
 }) {
   const payload = {
-    Course_Code: input.courseCode.trim(),
-    Course_Name: input.courseName.trim(),
-    Course_Name_Alt: input.courseNameAlt?.trim() || null,
-    Major: input.major.trim(),
-    Professor: input.professor?.trim() ?? "",
+    course_code: input.courseCode.trim(),
+    course_name: input.courseName.trim(),
+    course_name_alt: input.courseNameAlt?.trim() || null,
+    major: input.major.trim(),
+    professor: input.professor?.trim() ?? "",
   };
 
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .insert([payload])
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
     .single();
 

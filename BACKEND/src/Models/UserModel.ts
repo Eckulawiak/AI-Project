@@ -2,22 +2,22 @@ import { supabase } from "../Database/supabaseClient.js";
 
 export async function findStudentByEmail(email: string) {
   const { data } = await supabase
-    .from("Student")
+    .from("student")
     .select(
-      "Student_Id, Student_Qu_Email, FirstName, LastName, Major, Password, reset_code, reset_code_expiry",
+      "student_id, student_qu_email, firstname, lastname, major, password, reset_code, reset_code_expiry",
     )
-    .eq("Student_Qu_Email", email)
+    .eq("student_qu_email", email)
     .single();
   return data ?? null;
 }
 
 export async function findFacultyByEmail(email: string) {
   const { data } = await supabase
-    .from("Faculty_Admin")
+    .from("faculty_admin")
     .select(
-      "Faculty_Id, Faculty_Qu_Email, FirstName, LastName, Type, Password, reset_code, reset_code_expiry",
+      "faculty_id, faculty_qu_email, firstname, lastname, type, password, reset_code, reset_code_expiry",
     )
-    .eq("Faculty_Qu_Email", email)
+    .eq("faculty_qu_email", email)
     .single();
   return data ?? null;
 }

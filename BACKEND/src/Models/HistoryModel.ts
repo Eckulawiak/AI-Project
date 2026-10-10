@@ -9,9 +9,20 @@ export type HistoryRow = {
 };
 
 type StudentHistoryRow = {
-  Student_id: number;
-  History_id: number;
+  student_id: number;
+  history_id: number;
 };
+
+// DB columns are lowercase; the API keeps the HistoryRow shape
+function toHistoryRow(row: any): HistoryRow {
+  return {
+    id: row.id,
+    Date: row.date,
+    CourseName: row.coursename,
+    CourseCode: row.coursecode,
+    TalkingPoint: row.talkingpoint,
+  };
+}
 
 function cleanTalkingPoints(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
@@ -51,30 +62,30 @@ export async function saveTalkingPointsForStudent(
     throw new Error("At least one talking point is required");
   }
 
-  // 🔥 include CourseCode here
+  // 🔥 include coursecode here
   const historyPayload = talkingPoints.map((point) => ({
-    CourseName: courseName,
-    CourseCode: courseCode,
-    TalkingPoint: point,
+    coursename: courseName,
+    coursecode: courseCode,
+    talkingpoint: point,
   }));
 
   const { data: insertedHistory, error: historyInsertError } = await supabase
-    .from("History")
+    .from("history")
     .insert(historyPayload)
-    .select("id, Date, CourseName, CourseCode, TalkingPoint");
+    .select("id, date, coursename, coursecode, talkingpoint");
 
   if (historyInsertError) throw historyInsertError;
 
-  const historyRows = insertedHistory ?? [];
+  const historyRows = (insertedHistory ?? []).map(toHistoryRow);
 
   // map to student
   const studentHistoryPayload = historyRows.map((row) => ({
-    Student_id: studentId,
-    History_id: row.id,
+    student_id: studentId,
+    history_id: row.id,
   }));
 
   const { error: joinInsertError } = await supabase
-    .from("Student_History")
+    .from("student_history")
     .insert(studentHistoryPayload);
 
   if (joinInsertError) throw joinInsertError;
@@ -87,27 +98,28 @@ export async function getHistoryForStudent(studentId: number) {
   }
 
   const { data, error } = await supabase
-    .from("Student_History")
+    .from("student_history")
     .select(
       `
-      Student_id,
-      History_id,
-      History (
+      student_id,
+      history_id,
+      history (
         id,
-        Date,
-        CourseName,
-        CourseCode,
-        TalkingPoint
+        date,
+        coursename,
+        coursecode,
+        talkingpoint
       )
     `,
     )
-    .eq("Student_id", studentId);
+    .eq("student_id", studentId);
 
   if (error) throw error;
 
   const rows = (data ?? [])
-    .map((row: any) => row.History)
+    .map((row: any) => row.history)
     .filter(Boolean)
+    .map(toHistoryRow)
     .sort(
       (a: HistoryRow, b: HistoryRow) =>
         new Date(b.Date).getTime() - new Date(a.Date).getTime(),
@@ -130,10 +142,10 @@ export async function deleteHistoryEntryForStudent(
 
   // 1) Verify the student actually has this history entry
   const { data: existingLink, error: existingLinkError } = await supabase
-    .from("Student_History")
-    .select("Student_id, History_id")
-    .eq("Student_id", studentId)
-    .eq("History_id", historyId)
+    .from("student_history")
+    .select("student_id, history_id")
+    .eq("student_id", studentId)
+    .eq("history_id", historyId)
     .maybeSingle();
 
   if (existingLinkError) throw existingLinkError;
@@ -144,15 +156,15 @@ export async function deleteHistoryEntryForStudent(
 
   // 2) Delete ALL mappings for this history entry (not just this student)
   const { error: deleteAllMappingsError } = await supabase
-    .from("Student_History")
+    .from("student_history")
     .delete()
-    .eq("History_id", historyId);
+    .eq("history_id", historyId);
 
   if (deleteAllMappingsError) throw deleteAllMappingsError;
 
   // 3) Delete the history row itself
   const { error: deleteHistoryError } = await supabase
-    .from("History")
+    .from("history")
     .delete()
     .eq("id", historyId);
 
@@ -171,9 +183,9 @@ export async function deleteAllHistoryForStudent(studentId: number) {
 
   // 1) Find all history IDs linked to this student
   const { data: links, error: fetchError } = await supabase
-    .from("Student_History")
-    .select("History_id")
-    .eq("Student_id", studentId);
+    .from("student_history")
+    .select("history_id")
+    .eq("student_id", studentId);
 
   if (fetchError) throw fetchError;
 
@@ -181,19 +193,19 @@ export async function deleteAllHistoryForStudent(studentId: number) {
     return { success: true, message: "No history found to clear." };
   }
 
-  const historyIds = links.map((link) => link.History_id);
+  const historyIds = links.map((link) => link.history_id);
 
   // 2) Delete the mappings for this student
   const { error: mappingDeleteError } = await supabase
-    .from("Student_History")
+    .from("student_history")
     .delete()
-    .eq("Student_id", studentId);
+    .eq("student_id", studentId);
 
   if (mappingDeleteError) throw mappingDeleteError;
 
   // 3) Delete the actual history rows
   const { error: historyDeleteError } = await supabase
-    .from("History")
+    .from("history")
     .delete()
     .in("id", historyIds);
 

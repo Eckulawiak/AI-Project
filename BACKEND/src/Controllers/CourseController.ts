@@ -4,7 +4,7 @@ import { getAllCourses, getCoursesByMajor } from "../Models/CoursesModel.js";
 export const getGroupedCourses = async (req: Request, res: Response) => {
   try {
     const courses = await getAllCourses();
-    const majors = [...new Set(courses.map((c) => c.Major))].sort();
+    const majors = [...new Set(courses.map((c) => c.major))].sort();
 
     const grouped: Record<
       string,

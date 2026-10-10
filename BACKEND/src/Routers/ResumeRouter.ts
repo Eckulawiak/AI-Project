@@ -73,8 +73,8 @@ router.post("/generate", async (req, res) => {
         ? buildResumePrompt(classBlocks)
         : buildTalkingPointsPrompt(classBlocks);
 
-    const API_KEY = process.env.VITE_AIAPIKEY;
-    const OPENROUTER_URL = process.env.VITE_OPEN_ROUTER_URL;
+    const API_KEY = process.env.AIAPIKEY;
+    const OPENROUTER_URL = process.env.OPEN_ROUTER_URL;
 
     if (!API_KEY || !OPENROUTER_URL) {
       throw new Error("Missing OpenRouter credentials in backend environment.");
@@ -140,11 +140,9 @@ router.post("/generate", async (req, res) => {
 
     // 4. If the loop finishes without returning, it means ALL models failed.
     console.error("All fallback models exhausted. Last error:", lastError);
-    return res
-      .status(500)
-      .json({
-        error: "Failed to generate AI content. Please try again later.",
-      });
+    return res.status(500).json({
+      error: "Failed to generate AI content. Please try again later.",
+    });
   } catch (error: any) {
     console.error("Backend AI Generation Error:", error);
     return res

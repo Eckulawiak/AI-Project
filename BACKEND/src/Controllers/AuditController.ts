@@ -7,7 +7,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
     const { startDate, endDate, role } = req.query;
 
     let query = supabase
-      .from("AuditLogs")
+      .from("auditlogs")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -45,7 +45,7 @@ export const exportAuditLogs = async (req: Request, res: Response) => {
     const { startDate, endDate, role } = req.query;
 
     let query = supabase
-      .from("AuditLogs")
+      .from("auditlogs")
       .select("*")
       .order("created_at", { ascending: false });
 

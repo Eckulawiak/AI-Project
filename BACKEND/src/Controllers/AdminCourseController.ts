@@ -27,17 +27,17 @@ export const getAdminCourses = async (req: Request, res: Response) => {
 
     const rows = await Promise.all(
       courses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.Course_Id);
+        const { skills, competencies } = await getCourseMappings(c.course_id);
         const completion =
           skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
 
         return {
-          id: c.Course_Id,
-          course: c.Course_Code,
-          courseName: c.Course_Name,
-          altName: c.Course_Name_Alt ?? null,
-          major: c.Major,
-          professor: c.Professor ?? "",
+          id: c.course_id,
+          course: c.course_code,
+          courseName: c.course_name,
+          altName: c.course_name_alt ?? null,
+          major: c.major,
+          professor: c.professor ?? "",
           completion,
           skills,
           competencies,
@@ -100,14 +100,14 @@ export const updateAdminCourseMapping = async (
 
     const pairedCourses = await findPairedCoursesByCodeAndProfessor(
       courseId,
-      existingCourse.Course_Code,
-      existingCourse.Major,
-      existingCourse.Professor ?? "",
+      existingCourse.course_code,
+      existingCourse.major,
+      existingCourse.professor ?? "",
     );
 
     const allCourseIdsToReplace = [
       courseId,
-      ...pairedCourses.map((c) => c.Course_Id),
+      ...pairedCourses.map((c) => c.course_id),
     ];
 
     await replaceMappingsForCourseIds(allCourseIdsToReplace, uniqueIds);
@@ -115,7 +115,7 @@ export const updateAdminCourseMapping = async (
 
     res.json({
       updated,
-      syncedCourseIds: pairedCourses.map((c) => c.Course_Id),
+      syncedCourseIds: pairedCourses.map((c) => c.course_id),
       syncedCount: pairedCourses.length,
     });
   } catch (e: unknown) {
@@ -158,9 +158,9 @@ export const updateAdminCourseDetails = async (
     const syncedCourses =
       await updateCrossMajorMatchingCoursesByCodeAndProfessor(
         courseId,
-        existingCourse.Course_Code,
-        existingCourse.Major,
-        existingCourse.Professor ?? "",
+        existingCourse.course_code,
+        existingCourse.major,
+        existingCourse.professor ?? "",
         updates,
       );
 

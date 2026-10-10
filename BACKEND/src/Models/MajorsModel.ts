@@ -3,7 +3,7 @@ import { supabase } from "../Database/supabaseClient.js";
 export async function getMajors() {
   // Fetches only the list of majors. very lightweight.
   const { data, error } = await supabase
-    .from("Majors")
+    .from("majors")
     .select("name")
     .order("name", { ascending: true });
 
@@ -14,7 +14,7 @@ export async function getMajors() {
 
 export async function getMajorsWithIds() {
   const { data, error } = await supabase
-    .from("Majors")
+    .from("majors")
     .select("id, name")
     .order("name", { ascending: true });
 
@@ -27,7 +27,7 @@ export async function findMajorByName(majorName: string) {
   const trimmed = majorName.trim();
 
   const { data, error } = await supabase
-    .from("Majors")
+    .from("majors")
     .select("id, name")
     .ilike("name", trimmed)
     .maybeSingle();

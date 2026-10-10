@@ -1,37 +1,37 @@
 import { supabase } from "../Database/supabaseClient.js";
 
-// Return just the course IDs a faculty member owns via Faculty_Courses
+// Return just the course IDs a faculty member owns via faculty_courses
 export async function getFacultyCourseIds(facultyId: number) {
   const { data, error } = await supabase
-    .from("Faculty_Courses")
-    .select("Course_Id")
-    .eq("Faculty_Id", facultyId);
+    .from("faculty_courses")
+    .select("course_id")
+    .eq("faculty_id", facultyId);
 
   if (error) throw new Error(error.message);
 
   return (data ?? [])
-    .map((row: any) => row.Course_Id as number)
+    .map((row: any) => row.course_id as number)
     .filter((id) => typeof id === "number");
 }
 
 // Look up the full name of a faculty member
 export async function getFacultyName(facultyId: number): Promise<string> {
   const { data, error } = await supabase
-    .from("Faculty_Admin")
-    .select("FirstName, LastName")
-    .eq("Faculty_Id", facultyId)
+    .from("faculty_admin")
+    .select("firstname, lastname")
+    .eq("faculty_id", facultyId)
     .single();
 
   if (error) throw new Error(error.message);
-  return `${data.FirstName} ${data.LastName}`.trim();
+  return `${data.firstname} ${data.lastname}`.trim();
 }
 
 /**
  * Returns all courses visible to a faculty member in a single query.
  * A course is visible if ANY of these are true:
- * 1. The faculty member owns it via Faculty_Courses
- * 2. The course Professor field is blank / null (unassigned)
- * 3. The course Professor field matches the faculty member's full name
+ * 1. The faculty member owns it via faculty_courses
+ * 2. The course professor field is blank / null (unassigned)
+ * 3. The course professor field matches the faculty member's full name
  *
  * Filtering and joining happen in the DB — nothing is fetched and discarded
  * in JavaScript.
@@ -44,25 +44,25 @@ export async function getVisibleCoursesForFaculty(
   const [ownedIds, byName, unassigned] = await Promise.all([
     getFacultyCourseIds(facultyId),
 
-    // Courses where Professor matches the faculty member's name
+    // Courses where professor matches the faculty member's name
     supabase
-      .from("Courses")
+      .from("courses")
       .select(
-        "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+        "course_id, course_code, course_name, course_name_alt, major, professor",
       )
-      .ilike("Professor", facultyFullName)
-      .order("Major", { ascending: true })
-      .order("Course_Code", { ascending: true }),
+      .ilike("professor", facultyFullName)
+      .order("major", { ascending: true })
+      .order("course_code", { ascending: true }),
 
-    // Courses where Professor is blank / null
+    // Courses where professor is blank / null
     supabase
-      .from("Courses")
+      .from("courses")
       .select(
-        "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+        "course_id, course_code, course_name, course_name_alt, major, professor",
       )
-      .or("Professor.is.null,Professor.eq.")
-      .order("Major", { ascending: true })
-      .order("Course_Code", { ascending: true }),
+      .or("professor.is.null,professor.eq.")
+      .order("major", { ascending: true })
+      .order("course_code", { ascending: true }),
   ]);
 
   if (byName.error) throw new Error(byName.error.message);
@@ -72,19 +72,19 @@ export async function getVisibleCoursesForFaculty(
   let ownedRows: any[] = [];
   if (ownedIds.length > 0) {
     const { data, error } = await supabase
-      .from("Courses")
+      .from("courses")
       .select(
-        "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+        "course_id, course_code, course_name, course_name_alt, major, professor",
       )
-      .in("Course_Id", ownedIds)
-      .order("Major", { ascending: true })
-      .order("Course_Code", { ascending: true });
+      .in("course_id", ownedIds)
+      .order("major", { ascending: true })
+      .order("course_code", { ascending: true });
 
     if (error) throw new Error(error.message);
     ownedRows = data ?? [];
   }
 
-  // Merge all three sets, deduplicate by Course_Id
+  // Merge all three sets, deduplicate by course_id
   const seen = new Set<number>();
   const merged: any[] = [];
 
@@ -93,35 +93,35 @@ export async function getVisibleCoursesForFaculty(
     ...(byName.data ?? []),
     ...(unassigned.data ?? []),
   ]) {
-    if (!seen.has(row.Course_Id)) {
-      seen.add(row.Course_Id);
+    if (!seen.has(row.course_id)) {
+      seen.add(row.course_id);
       merged.push(row);
     }
   }
 
-  // Sort merged result by Major then Course_Code
+  // Sort merged result by major then course_code
   merged.sort((a, b) => {
-    const majorCmp = a.Major.localeCompare(b.Major);
+    const majorCmp = a.major.localeCompare(b.major);
     if (majorCmp !== 0) return majorCmp;
-    return a.Course_Code.localeCompare(b.Course_Code);
+    return a.course_code.localeCompare(b.course_code);
   });
 
   return merged;
 }
 
 /**
- * Returns courses where the Professor field is null, an empty string,
+ * Returns courses where the professor field is null, an empty string,
  * or specifically labeled "N/A".
  */
 export async function getUnassignedCourses() {
   const { data, error } = await supabase
-    .from("Courses")
+    .from("courses")
     .select(
-      "Course_Id, Course_Code, Course_Name, Course_Name_Alt, Major, Professor",
+      "course_id, course_code, course_name, course_name_alt, major, professor",
     )
-    .or("Professor.is.null,Professor.eq.,Professor.eq.N/A")
-    .order("Major", { ascending: true })
-    .order("Course_Code", { ascending: true });
+    .or("professor.is.null,professor.eq.,professor.eq.N/A")
+    .order("major", { ascending: true })
+    .order("course_code", { ascending: true });
 
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -131,10 +131,10 @@ export async function assignCourseToFaculty(
   facultyId: number,
   courseId: number,
 ) {
-  const { error } = await supabase.from("Faculty_Courses").insert([
+  const { error } = await supabase.from("faculty_courses").insert([
     {
-      Faculty_Id: facultyId,
-      Course_Id: courseId,
+      faculty_id: facultyId,
+      course_id: courseId,
     },
   ]);
 

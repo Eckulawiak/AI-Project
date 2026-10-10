@@ -140,9 +140,9 @@ const StudentDashboard: React.FC = () => {
         }
 
         const { data: mappingsData, error: mappingsError } = await supabase
-          .from("Courses_Skill_Mapping")
+          .from("courses_skill_mapping")
           .select("*")
-          .in("Course_Id", allOfferingIds);
+          .in("course_id", allOfferingIds);
 
         if (mappingsError) throw mappingsError;
 
@@ -152,27 +152,27 @@ const StudentDashboard: React.FC = () => {
         }
 
         const skillIds = [
-          ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
+          ...new Set(mappingsData.map((m) => getVal(m, "skill_id"))),
         ];
 
         const { data: skillsData, error: skillsError } = await supabase
-          .from("Skills")
+          .from("skills")
           .select("*")
-          .in("Skill_Id", skillIds);
+          .in("skill_id", skillIds);
 
         if (skillsError) throw skillsError;
 
         const allSkills = (skillsData || []).map((s) => ({
-          Skill_Id: getVal(s, "Skill_Id"),
-          Skill_Name: getVal(s, "Skill_name"),
-          Type: getVal(s, "Type"),
+          Skill_Id: getVal(s, "skill_id"),
+          Skill_Name: getVal(s, "skill_name"),
+          Type: getVal(s, "type"),
         }));
 
         const skillsLookup: Record<string, Skill[]> = {};
 
         mappingsData.forEach((mapping) => {
-          const mCourseId = getVal(mapping, "Course_Id");
-          const mSkillId = getVal(mapping, "Skill_Id");
+          const mCourseId = getVal(mapping, "course_id");
+          const mSkillId = getVal(mapping, "skill_id");
           const key = String(mCourseId);
 
           const skillDetail = allSkills.find(
