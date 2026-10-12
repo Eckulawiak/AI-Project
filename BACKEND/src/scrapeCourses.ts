@@ -16,11 +16,15 @@
  * Usage (from BACKEND/):
  *   npm run scrape              scrape and write to Supabase
  *   npm run scrape -- --dry-run scrape and write catalog.json only
+ *   npm run scrape -- --clear   empty the scraped tables first, then write
+ *
+ * --clear runs only after the scrape succeeds, so a failed scrape never
+ * leaves the tables empty.
  */
 
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { writeFileSync } from "fs";
 import { resolve, dirname } from "path";
@@ -296,13 +300,51 @@ async function scrapeCourses(): Promise<ScrapedCourse[]> {
   return [...courses.values()];
 }
 
+// ── Clear the scraped tables ────────────────────────────────────────────────
+// Children before parents so foreign keys don't block the deletes. Rows in
+// other tables that point at a course or major (skill mappings, faculty
+// course claims, course history...) are not touched; if any exist the delete
+// fails with the name of the blocking table instead of removing them.
+const CLEAR_ORDER: { table: string; key: string }[] = [
+  { table: "major_courses", key: "major_id" },
+  { table: "courses", key: "course_id" },
+  { table: "majors", key: "id" },
+  { table: "schools", key: "id" },
+];
+
+async function clearTables(supabase: SupabaseClient) {
+  console.log("Clearing scraped tables...");
+  for (const { table, key } of CLEAR_ORDER) {
+    // Supabase refuses an unfiltered delete, so match every row by key.
+    const { error, count } = await supabase
+      .from(table)
+      .delete({ count: "exact" })
+      .not(key, "is", null);
+    if (error) {
+      throw new Error(
+        `Could not clear ${table}: ${error.message}` +
+          (error.code === "23503"
+            ? " (other rows still reference it; clear those first)"
+            : ""),
+      );
+    }
+    console.log(`  ✓ ${table}: ${count ?? 0} rows deleted`);
+  }
+}
+
 // ── Write to Supabase ───────────────────────────────────────────────────────
-async function writeToSupabase(majors: ScrapedMajor[], courses: ScrapedCourse[]) {
+async function writeToSupabase(
+  majors: ScrapedMajor[],
+  courses: ScrapedCourse[],
+  clearFirst: boolean,
+) {
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_API_KEY!,
   );
   const CHUNK = 200;
+
+  if (clearFirst) await clearTables(supabase);
 
   // Fetch every row of a table (Supabase caps a select at 1000 rows).
   async function selectAll<T>(table: string, columns: string): Promise<T[]> {
@@ -417,6 +459,7 @@ async function writeToSupabase(majors: ScrapedMajor[], courses: ScrapedCourse[])
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
+  const clearFirst = process.argv.includes("--clear");
   console.log(`=== QU Course Catalog Scraper${dryRun ? " (dry run)" : ""} ===\n`);
 
   const majors = await scrapeMajors();
@@ -433,7 +476,7 @@ async function main() {
     return;
   }
 
-  await writeToSupabase(majors, courses);
+  await writeToSupabase(majors, courses, clearFirst);
   console.log("\n✅ Done!");
 }
 
