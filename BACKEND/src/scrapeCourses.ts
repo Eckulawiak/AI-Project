@@ -32,7 +32,9 @@ dotenv.config({ path: resolve(__dirname, "../.env") });
 
 const BASE_URL = "https://catalog.qu.edu";
 const SUBJECT_INDEX = "/courses-undergraduate/";
-const REQUEST_DELAY_MS = 300;
+const REQUEST_DELAY_MS = 500;
+const USER_AGENT =
+  "Mozilla/5.0 (compatible; QU-Career-Services-Scraper/1.0; +https://catalog.qu.edu)";
 
 // ── Schools: display name → catalog page path ───────────────────────────────
 // Taken from the catalog home page sidebar. Schools with no bachelor's
@@ -66,15 +68,30 @@ export type ScrapedCourse = {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchPage(path: string): Promise<string | null> {
+// The catalog server drops some requests (ECONNRESET), so retry with
+// backoff and skip the page instead of ending the whole run.
+async function fetchPage(path: string, attempts = 4): Promise<string | null> {
   const url = new URL(path, BASE_URL).toString();
-  const res = await fetch(url);
-  await sleep(REQUEST_DELAY_MS);
-  if (!res.ok) {
-    console.error(`  ✗ Failed to fetch ${url} (${res.status})`);
-    return null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+      });
+      await sleep(REQUEST_DELAY_MS);
+      if (res.ok) return await res.text();
+      if (res.status < 500 && res.status !== 429) {
+        console.error(`  ✗ Failed to fetch ${url} (${res.status})`);
+        return null;
+      }
+      console.warn(`  ! ${url} returned ${res.status} (attempt ${attempt}/${attempts})`);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`  ! ${url}: ${reason} (attempt ${attempt}/${attempts})`);
+    }
+    await sleep(1000 * 2 ** attempt);
   }
-  return res.text();
+  console.error(`  ✗ Giving up on ${url}`);
+  return null;
 }
 
 // "SER 120" / "SER&nbsp;120" → "SER-120" (the format the app already uses)
@@ -128,12 +145,16 @@ export function parseSubjectPage(
 }
 
 // ── Bachelor's programs on one school page ──────────────────────────────────
-// Program lists sit under headings like "Bachelor of Science",
-// "Bachelor of Arts" or "Bachelor's Degrees". Link text is either
-// "Bachelor of Science in Biology" or just "Accounting".
+// Pages differ: Engineering lists "Bachelor of Science in Computer Science"
+// under a "Bachelor of Science" heading, Business lists "Accounting" under
+// "Bachelor's Degrees", and some pages use bold text instead of headings.
+// A link counts as a bachelor's program if it is inside the school's own
+// path and either sits under a bachelor's heading, says "Bachelor of ...",
+// or its URL ends in a bachelor's degree slug (-bs, -ba, bs-..., -bsn, ...).
 const BACHELOR_HEADING = /^bachelor/i;
 const SKIP_PROGRAM =
-  /accelerated|dual|double|part-time|second degree|completion|minor|certificate|master|doctor/i;
+  /accelerated|dual|double|part-time|second degree|completion|minor|certificate|master|doctor|badge/i;
+const BACHELOR_SLUG = /(^|-)(bs|ba|bfa|bsn|bba)(-|$)/;
 
 export function majorNameFromLink(text: string): string {
   return clean(text)
@@ -145,35 +166,60 @@ export function majorNameFromLink(text: string): string {
 
 export function parseSchoolPrograms(
   html: string,
+  schoolPath: string,
 ): { name: string; path: string }[] {
   const $ = cheerio.load(html);
-  const root = $("#programstextcontainer").length
-    ? $("#programstextcontainer")
-    : $("#textcontainer").length
-      ? $("#textcontainer")
-      : $("main, #content").first();
-
   const programs = new Map<string, string>(); // path → name
-  let inBachelors = false;
+  // What the most recent heading was about: a bachelor's list, a list to
+  // skip (minors, dual degrees, completion programs...), or anything else.
+  let section: "bachelors" | "skip" | "other" = "other";
 
   // find() returns elements in document order, so each link is seen after
-  // the heading it sits under.
-  root.find("h1, h2, h3, h4, a").each((_i, el) => {
-    if (el.tagName !== "a") {
-      const heading = clean($(el).text());
-      inBachelors = BACHELOR_HEADING.test(heading) && !SKIP_PROGRAM.test(heading);
-      return;
-    }
-    if (!inBachelors) return;
+  // the heading it sits under. Short bold paragraphs count as headings.
+  $("body")
+    .find("h1, h2, h3, h4, h5, p > strong, p > b, a")
+    .each((_i, el) => {
+      if (el.tagName !== "a") {
+        const heading = clean($(el).text());
+        if (heading.length > 60) return;
+        section = SKIP_PROGRAM.test(heading)
+          ? "skip"
+          : BACHELOR_HEADING.test(heading)
+            ? "bachelors"
+            : "other";
+        return;
+      }
 
-    const href = $(el).attr("href") ?? "";
-    const text = clean($(el).text());
-    if (!href.startsWith("/") || href.startsWith("/graduate-studies/")) return;
-    if (!text || SKIP_PROGRAM.test(text) || programs.has(href)) return;
+      const href = $(el).attr("href") ?? "";
+      let path: string;
+      try {
+        const url = new URL(href, BASE_URL);
+        if (url.origin !== BASE_URL) return;
+        path = url.pathname;
+      } catch {
+        return;
+      }
+      if (!path.startsWith(schoolPath) || path === schoolPath) return;
 
-    const name = majorNameFromLink(text);
-    if (name) programs.set(href, name);
-  });
+      const text = clean($(el).text());
+      if (!text || SKIP_PROGRAM.test(text) || SKIP_PROGRAM.test(path)) return;
+      if (programs.has(path)) return;
+
+      // Department pages (/school/dept/) can show up in the sidebar while a
+      // bachelor's heading is still "open", so a heading alone needs a
+      // program-depth path (/school/dept/program/).
+      const segments = path.split("/").filter(Boolean);
+      const slug = segments[segments.length - 1] ?? "";
+      const isBachelors =
+        section !== "skip" &&
+        (/^bachelor of/i.test(text) ||
+          BACHELOR_SLUG.test(slug) ||
+          (section === "bachelors" && segments.length >= 3));
+      if (!isBachelors) return;
+
+      const name = majorNameFromLink(text);
+      if (name) programs.set(path, name);
+    });
 
   return [...programs].map(([path, name]) => ({ name, path }));
 }
@@ -201,7 +247,7 @@ async function scrapeMajors(): Promise<ScrapedMajor[]> {
     const html = await fetchPage(path);
     if (!html) continue;
 
-    const programs = parseSchoolPrograms(html);
+    const programs = parseSchoolPrograms(html, path);
     console.log(`  ✓ Found ${programs.length} bachelor's programs`);
 
     for (const program of programs) {
