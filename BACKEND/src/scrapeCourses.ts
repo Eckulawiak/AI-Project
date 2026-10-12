@@ -110,7 +110,9 @@ export function parseSubjectIndex(
   $(`a[href^="${SUBJECT_INDEX}"]`).each((_i, el) => {
     const href = $(el).attr("href") ?? "";
     const match = clean($(el).text()).match(/^(.+?)\s*\(([A-Z]+)\)$/);
-    if (!match || href === SUBJECT_INDEX || seen.has(href)) return;
+    // Subject pages end in "/"; this skips "Download Page (PDF)".
+    if (!match || href === SUBJECT_INDEX || !href.endsWith("/")) return;
+    if (seen.has(href)) return;
     seen.set(href, match[1]!);
   });
   return [...seen].map(([path, name]) => ({ name, path }));
