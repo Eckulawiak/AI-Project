@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "tsx watch src/Server.ts",
     "build": "tsc",
-    "start": "node dist/Server.js"
+    "start": "node dist/Server.js",
+    "scrape": "tsx src/scrapeCourses.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
