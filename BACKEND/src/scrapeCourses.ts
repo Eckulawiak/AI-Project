@@ -238,8 +238,10 @@ export function gradNameFromLink(text: string, heading: string): string {
     .replace(/\s+program$/i, "")
     .trim();
   if (DEGREE_WORDS.test(name) || /^m[a-z]{1,3} in /i.test(name)) return name;
+  // Only a heading that is itself a degree title ("Master of Science") is
+  // prefixed; "Master's Degree" or "Doctoral Degrees" just label a list.
   const degree = clean(heading.replace(/\(.*?\)/g, ""));
-  if (!DEGREE_WORDS.test(degree)) return name;
+  if (!/^(master|doctor) of |^juris doctor/i.test(degree)) return name;
   return / in /i.test(degree) ? `${degree}: ${name}` : `${degree} in ${name}`;
 }
 
