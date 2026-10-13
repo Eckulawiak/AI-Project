@@ -6,8 +6,11 @@
  * (schools, majors) or course code (courses), never duplicated.
  *
  *   schools        ← the school/college pages linked from the catalog home
- *   majors         ← the bachelor's programs listed on each school page
- *   courses        ← every course on every undergraduate subject page
+ *   majors         ← the bachelor's, master's and doctoral programs listed on
+ *                    each school's undergraduate and graduate pages
+ *                    (minors, certificates and dual degrees are skipped)
+ *   courses        ← every course on every undergraduate and graduate
+ *                    subject page
  *   major_courses  ← the courses named in each major's requirements table
  *
  * The catalog does not list instructors, so new courses get professor "N/A"
@@ -35,29 +38,55 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
 const BASE_URL = "https://catalog.qu.edu";
-const SUBJECT_INDEX = "/courses-undergraduate/";
+const SUBJECT_INDEXES: { path: string; level: "undergrad" | "grad" }[] = [
+  { path: "/courses-undergraduate/", level: "undergrad" },
+  { path: "/courses-graduate/", level: "grad" },
+];
 const REQUEST_DELAY_MS = 500;
 const USER_AGENT =
   "Mozilla/5.0 (compatible; QU-Career-Services-Scraper/1.0; +https://catalog.qu.edu)";
 
-// ── Schools: display name → catalog page path ───────────────────────────────
-// Taken from the catalog home page sidebar. Schools with no bachelor's
-// programs (Law, Medicine, Education) are still created so they can be
-// onboarded later; they just get no majors.
-export const SCHOOLS: Record<string, string> = {
-  "College of Arts & Sciences": "/arts-sciences/",
-  "School of Business": "/business/",
-  "School of Communications": "/communications/",
-  "School of Computing & Engineering": "/engineering/",
-  "School of Education": "/graduate-studies/education/",
-  "School of Health Sciences": "/health-sciences/",
-  "School of Law": "/school-of-law/",
-  "Frank H. Netter MD School of Medicine": "/school-of-medicine/",
-  "School of Nursing": "/nursing/",
+// ── Schools: display name → catalog page paths ──────────────────────────────
+// From the catalog home and Graduate Studies sidebars. Law and Medicine have
+// one page that lists their graduate programs; Education is graduate-only.
+export type Level = "undergrad" | "grad";
+
+export const SCHOOLS: Record<string, { undergrad?: string; grad?: string }> = {
+  "College of Arts & Sciences": {
+    undergrad: "/arts-sciences/",
+    grad: "/graduate-studies/arts-sciences/",
+  },
+  "School of Business": {
+    undergrad: "/business/",
+    grad: "/graduate-studies/business/",
+  },
+  "School of Communications": {
+    undergrad: "/communications/",
+    grad: "/graduate-studies/communications/",
+  },
+  "School of Computing & Engineering": {
+    undergrad: "/engineering/",
+    grad: "/graduate-studies/engineering/",
+  },
+  "School of Education": { grad: "/graduate-studies/education/" },
+  "School of Health Sciences": {
+    undergrad: "/health-sciences/",
+    grad: "/graduate-studies/health-sciences/",
+  },
+  "School of Law": { grad: "/school-of-law/" },
+  "Frank H. Netter MD School of Medicine": { grad: "/school-of-medicine/" },
+  "School of Nursing": {
+    undergrad: "/nursing/",
+    grad: "/graduate-studies/nursing/",
+  },
 };
 
 export type ScrapedMajor = {
   name: string;
+  // The subject a course list is named after, e.g. "Computer Science" for
+  // both "Computer Science" (BS) and "Master of Science in Computer Science".
+  field: string;
+  level: Level;
   school: string;
   urls: string[];
   courseCodes: string[];
@@ -67,6 +96,7 @@ export type ScrapedCourse = {
   course_code: string;
   course_name: string;
   subject: string;
+  level: Level;
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -103,19 +133,27 @@ export function normalizeCode(raw: string): string {
   return raw.replace(/ /g, " ").trim().replace(/\s+/, "-");
 }
 
-const clean = (s: string) => s.replace(/ /g, " ").replace(/\s+/g, " ").trim();
+// The catalog puts zero-width spaces in some names ("Game Design &\u200b
+// Development"), which breaks name matching, so strip them.
+const clean = (s: string) =>
+  s
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/ /g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 // ── Subjects: "Software Engineering (SER)" → { name, path } ─────────────────
 export function parseSubjectIndex(
   html: string,
+  indexPath: string,
 ): { name: string; path: string }[] {
   const $ = cheerio.load(html);
   const seen = new Map<string, string>();
-  $(`a[href^="${SUBJECT_INDEX}"]`).each((_i, el) => {
+  $(`a[href^="${indexPath}"]`).each((_i, el) => {
     const href = $(el).attr("href") ?? "";
     const match = clean($(el).text()).match(/^(.+?)\s*\(([A-Z]+)\)$/);
     // Subject pages end in "/"; this skips "Download Page (PDF)".
-    if (!match || href === SUBJECT_INDEX || !href.endsWith("/")) return;
+    if (!match || href === indexPath || !href.endsWith("/")) return;
     if (seen.has(href)) return;
     seen.set(href, match[1]!);
   });
@@ -126,6 +164,7 @@ export function parseSubjectIndex(
 export function parseSubjectPage(
   html: string,
   subject: string,
+  level: Level = "undergrad",
 ): ScrapedCourse[] {
   const $ = cheerio.load(html);
   const courses: ScrapedCourse[] = [];
@@ -144,23 +183,44 @@ export function parseSubjectPage(
       .trim();
 
     if (!courseCode || !courseName) return;
-    courses.push({ course_code: courseCode, course_name: courseName, subject });
+    courses.push({ course_code: courseCode, course_name: courseName, subject, level });
   });
 
   return courses;
 }
 
-// ── Bachelor's programs on one school page ──────────────────────────────────
+// ── Degree programs on one school page ──────────────────────────────────────
 // Pages differ: Engineering lists "Bachelor of Science in Computer Science"
 // under a "Bachelor of Science" heading, Business lists "Accounting" under
-// "Bachelor's Degrees", and some pages use bold text instead of headings.
-// A link counts as a bachelor's program if it is inside the school's own
-// path and either sits under a bachelor's heading, says "Bachelor of ...",
-// or its URL ends in a bachelor's degree slug (-bs, -ba, bs-..., -bsn, ...).
-const BACHELOR_HEADING = /^bachelor/i;
-const SKIP_PROGRAM =
-  /accelerated|dual|double|part-time|second degree|completion|minor|certificate|master|doctor|badge/i;
-const BACHELOR_SLUG = /(^|-)(bs|ba|bfa|bsn|bba)(-|$)/;
+// "Bachelor's Degrees", Health Sciences lists "Physician Assistant" under
+// "Master of Health Science", and some pages use bold text, not headings.
+// A link counts as a program if it is inside the school page's own path and
+// either sits under a degree heading, names the degree ("Bachelor of ...",
+// "Master of ..."), or its URL ends in a degree slug (-bs, ms-..., -dpt...).
+const SKIP_ANY =
+  /accelerated|dual|double|part-time|second degree|completion|minor|certificate|badge|micro-credential|concentration/i;
+// Combined degrees named like "JD/MBA" or "BA/MS" (link and heading text only)
+const COMBINED_DEGREE = /\b[A-Z]{2,4}\/[A-Z]{2,4}\b/;
+
+const LEVEL_RULES: Record<
+  Level,
+  { heading: RegExp; text: RegExp; slug: RegExp; skip: RegExp }
+> = {
+  undergrad: {
+    heading: /^bachelor/i,
+    text: /^bachelor of/i,
+    slug: /(^|-)(bs|ba|bfa|bsn|bba)(-|$)/,
+    skip: /master|doctor|juris/i,
+  },
+  grad: {
+    heading: /^(master|doctor|doctoral|juris|post-baccalaureate|graduate degree)/i,
+    text: /^(master|doctor|juris|post-baccalaureate|m[a-z]{1,3} in )/i,
+    slug: /(^|-)(ms|ma|mba|mhs|msw|msn|mot|mat|med|otd|dpt|dnp|edd|jd|md)(-|$)/,
+    skip: /bachelor/i,
+  },
+};
+
+const DEGREE_WORDS = /\b(bachelor|master|doctor|doctorate|juris)\b/i;
 
 export function majorNameFromLink(text: string): string {
   return clean(text)
@@ -170,15 +230,38 @@ export function majorNameFromLink(text: string): string {
     .trim();
 }
 
+// "Computer Science" under "Master of Science" → "Master of Science in
+// Computer Science"; "Full-Time Juris Doctor Program" → "Juris Doctor".
+export function gradNameFromLink(text: string, heading: string): string {
+  const name = clean(text)
+    .replace(/^full-time\s+/i, "")
+    .replace(/\s+program$/i, "")
+    .trim();
+  if (DEGREE_WORDS.test(name) || /^m[a-z]{1,3} in /i.test(name)) return name;
+  const degree = clean(heading.replace(/\(.*?\)/g, ""));
+  if (!DEGREE_WORDS.test(degree)) return name;
+  return / in /i.test(degree) ? `${degree}: ${name}` : `${degree} in ${name}`;
+}
+
+// "Master of Science in Computer Science" → "Computer Science"
+export function fieldOf(name: string): string {
+  const match = name.match(/ in (.+)$/i);
+  return match ? match[1]!.trim() : name;
+}
+
 export function parseSchoolPrograms(
   html: string,
   schoolPath: string,
+  level: Level = "undergrad",
 ): { name: string; path: string }[] {
+  const rules = LEVEL_RULES[level];
   const $ = cheerio.load(html);
   const programs = new Map<string, string>(); // path → name
-  // What the most recent heading was about: a bachelor's list, a list to
-  // skip (minors, dual degrees, completion programs...), or anything else.
-  let section: "bachelors" | "skip" | "other" = "other";
+  const schoolDepth = schoolPath.split("/").filter(Boolean).length;
+  // What the most recent heading was about: a degree list for this level,
+  // a list to skip (minors, dual degrees, the other level...), or other.
+  let section: "degrees" | "skip" | "other" = "other";
+  let heading = "";
 
   // find() returns elements in document order, so each link is seen after
   // the heading it sits under. Short bold paragraphs count as headings.
@@ -186,13 +269,15 @@ export function parseSchoolPrograms(
     .find("h1, h2, h3, h4, h5, p > strong, p > b, a")
     .each((_i, el) => {
       if (el.tagName !== "a") {
-        const heading = clean($(el).text());
-        if (heading.length > 60) return;
-        section = SKIP_PROGRAM.test(heading)
-          ? "skip"
-          : BACHELOR_HEADING.test(heading)
-            ? "bachelors"
-            : "other";
+        const text = clean($(el).text());
+        if (text.length > 80) return;
+        heading = text;
+        section =
+          SKIP_ANY.test(text) || COMBINED_DEGREE.test(text) || rules.skip.test(text)
+            ? "skip"
+            : rules.heading.test(text)
+              ? "degrees"
+              : "other";
         return;
       }
 
@@ -205,25 +290,31 @@ export function parseSchoolPrograms(
       } catch {
         return;
       }
+      if (!path.endsWith("/")) path += "/";
       if (!path.startsWith(schoolPath) || path === schoolPath) return;
 
       const text = clean($(el).text());
-      if (!text || SKIP_PROGRAM.test(text) || SKIP_PROGRAM.test(path)) return;
-      if (programs.has(path)) return;
+      if (!text || SKIP_ANY.test(text) || SKIP_ANY.test(path)) return;
+      if (COMBINED_DEGREE.test(text)) return;
+      if (rules.skip.test(text) || programs.has(path)) return;
 
-      // Department pages (/school/dept/) can show up in the sidebar while a
-      // bachelor's heading is still "open", so a heading alone needs a
-      // program-depth path (/school/dept/program/).
+      // Undergrad department pages (/school/dept/) show up in the sidebar
+      // while a bachelor's heading is still "open", so for undergrad a
+      // heading alone needs a program-depth path (/school/dept/program/).
       const segments = path.split("/").filter(Boolean);
       const slug = segments[segments.length - 1] ?? "";
-      const isBachelors =
+      const minDepth = level === "undergrad" ? 3 : schoolDepth + 1;
+      const isProgram =
         section !== "skip" &&
-        (/^bachelor of/i.test(text) ||
-          BACHELOR_SLUG.test(slug) ||
-          (section === "bachelors" && segments.length >= 3));
-      if (!isBachelors) return;
+        (rules.text.test(text) ||
+          rules.slug.test(slug) ||
+          (section === "degrees" && segments.length >= minDepth));
+      if (!isProgram) return;
 
-      const name = majorNameFromLink(text);
+      const name =
+        level === "undergrad"
+          ? majorNameFromLink(text)
+          : gradNameFromLink(text, section === "degrees" ? heading : "");
       if (name) programs.set(path, name);
     });
 
@@ -243,18 +334,60 @@ export function parseProgramCourseCodes(html: string): string[] {
   return [...codes];
 }
 
+// ── Course subject → major ──────────────────────────────────────────────────
+// Courses are listed by subject, not major, so a course gets the major whose
+// name matches its subject. Names are compared loosely ("&" = "and", case
+// and punctuation ignored), and a subject that starts exactly one major's
+// name also matches ("Hispanic" → "Hispanic and Latin American Studies").
+// Subjects that aren't majors at QU (Art, Physics, QU Seminars...) get none.
+const nameKey = (s: string) =>
+  clean(s)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/^bachelor of /, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export function matchSubjectToMajor(
+  subject: string,
+  level: Level,
+  majors: Pick<ScrapedMajor, "name" | "field" | "level">[],
+): string | undefined {
+  const key = nameKey(subject);
+  const match = (pool: typeof majors) => {
+    const exact = pool.find((m) => nameKey(m.field) === key);
+    if (exact) return exact.name;
+    const prefixed = pool.filter((m) => nameKey(m.field).startsWith(key + " "));
+    const fields = new Set(prefixed.map((m) => nameKey(m.field)));
+    return fields.size === 1 ? prefixed[0]!.name : undefined;
+  };
+  // Undergraduate courses go to undergraduate majors first and graduate
+  // courses to graduate ones (CSC 110 → Computer Science, CSC 510 → MS in CS).
+  return (
+    match(majors.filter((m) => m.level === level)) ??
+    match(majors.filter((m) => m.level !== level))
+  );
+}
+
 // ── Scrape everything ───────────────────────────────────────────────────────
 async function scrapeMajors(): Promise<ScrapedMajor[]> {
   // Same field offered as BA and BS (e.g. Computer Science) → one major.
   const majors = new Map<string, ScrapedMajor>();
 
-  for (const [school, path] of Object.entries(SCHOOLS)) {
-    console.log(`Fetching programs for ${school}...`);
+  const pages = Object.entries(SCHOOLS).flatMap(([school, paths]) =>
+    (["undergrad", "grad"] as const)
+      .filter((level) => paths[level])
+      .map((level) => ({ school, level, path: paths[level]! })),
+  );
+
+  for (const { school, level, path } of pages) {
+    console.log(`Fetching ${level} programs for ${school}...`);
     const html = await fetchPage(path);
     if (!html) continue;
 
-    const programs = parseSchoolPrograms(html, path);
-    console.log(`  ✓ Found ${programs.length} bachelor's programs`);
+    const programs = parseSchoolPrograms(html, path, level);
+    console.log(`  ✓ Found ${programs.length} ${level} programs`);
 
     for (const program of programs) {
       const programHtml = await fetchPage(program.path);
@@ -268,6 +401,8 @@ async function scrapeMajors(): Promise<ScrapedMajor[]> {
       }
       const major = existing ?? {
         name: program.name,
+        field: level === "undergrad" ? program.name : fieldOf(program.name),
+        level,
         school,
         urls: [],
         courseCodes: [],
@@ -282,17 +417,20 @@ async function scrapeMajors(): Promise<ScrapedMajor[]> {
 }
 
 async function scrapeCourses(): Promise<ScrapedCourse[]> {
-  const indexHtml = await fetchPage(SUBJECT_INDEX);
-  if (!indexHtml) throw new Error("Could not load the subject index");
-
-  const subjects = parseSubjectIndex(indexHtml);
-  console.log(`Found ${subjects.length} subjects`);
+  const subjects: { name: string; path: string; level: Level }[] = [];
+  for (const index of SUBJECT_INDEXES) {
+    const indexHtml = await fetchPage(index.path);
+    if (!indexHtml) throw new Error(`Could not load the subject index ${index.path}`);
+    const found = parseSubjectIndex(indexHtml, index.path);
+    console.log(`Found ${found.length} subjects in ${index.path}`);
+    subjects.push(...found.map((f) => ({ ...f, level: index.level })));
+  }
 
   const courses = new Map<string, ScrapedCourse>();
   for (const subject of subjects) {
     const html = await fetchPage(subject.path);
     if (!html) continue;
-    const found = parseSubjectPage(html, subject.name);
+    const found = parseSubjectPage(html, subject.name, subject.level);
     console.log(`  ✓ ${subject.name}: ${found.length} courses`);
     for (const c of found) courses.set(c.course_code, c);
   }
@@ -397,11 +535,21 @@ async function writeToSupabase(
   );
   const existingCodes = new Set(existing.map((c) => c.course_code));
 
+  const subjectMajor = new Map<string, number | null>();
+  const majorFor = (c: ScrapedCourse) => {
+    const key = `${c.level}:${c.subject}`;
+    if (!subjectMajor.has(key)) {
+      const name = matchSubjectToMajor(c.subject, c.level, majors);
+      subjectMajor.set(key, name ? (majorId.get(name) ?? null) : null);
+    }
+    return subjectMajor.get(key) ?? null;
+  };
+
   const toRow = (c: ScrapedCourse) => ({
     course_code: c.course_code,
     course_name: c.course_name,
     major: c.subject, // legacy text column (NOT NULL); the app still reads it
-    major_id: majorId.get(c.subject) ?? null,
+    major_id: majorFor(c),
   });
 
   const newCourses = courses.filter((c) => !existingCodes.has(c.course_code));
