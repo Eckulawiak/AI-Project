@@ -50,6 +50,7 @@
 
 .filter-left {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 1.5rem;
 }

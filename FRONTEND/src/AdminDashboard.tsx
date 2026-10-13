@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import "./AdminDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
+import { useSchools } from "./hooks/useSchools";
 
 type CompletionStatus = "Mapped" | "Unmapped";
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
@@ -14,6 +15,8 @@ interface AdminCourseRow {
   courseName: string;
   altName: string | null;
   major: string;
+  majorIds: number[];
+  schoolIds: number[];
   professor: string;
   completion: CompletionStatus;
   skills: string[];
@@ -54,13 +57,17 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 const AdminDashboard: React.FC = () => {
   /* ------------------------------ Filters ------------------------------ */
-  const [majorFilter, setMajorFilter] = useState<string>(
-    "Software Engineering",
-  );
+  const schools = useSchools();
+  // "" means All
+  const [schoolFilter, setSchoolFilter] = useState<string>("");
+  const [majorFilter, setMajorFilter] = useState<string>("");
   const [completionFilter, setCompletionFilter] =
     useState<CompletionFilter>("All");
 
-  const [availableMajors, setAvailableMajors] = useState<string[]>([]);
+  const availableMajors = useMemo(
+    () => schools.find((s) => String(s.id) === schoolFilter)?.majors ?? [],
+    [schools, schoolFilter],
+  );
 
   /* ------------------------------ Table state ------------------------------ */
   const [rows, setRows] = useState<AdminCourseRow[]>([]);
@@ -72,25 +79,13 @@ const AdminDashboard: React.FC = () => {
   );
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Start on the School of Computing & Engineering once schools load
   useEffect(() => {
-    const fetchMajors = async () => {
-      try {
-        const data = await apiFetch<Record<string, unknown>>("/courses");
-        const dynamicMajors = Object.keys(data);
-
-        if (dynamicMajors.length > 0) {
-          setAvailableMajors(dynamicMajors);
-          if (!dynamicMajors.includes(majorFilter)) {
-            setMajorFilter(dynamicMajors[0]);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load majors list:", e);
-      }
-    };
-    fetchMajors();
+    if (schools.length === 0 || schoolFilter) return;
+    const start = schools.find((s) => /computing/i.test(s.name)) ?? schools[0];
+    setSchoolFilter(String(start.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [schools]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +96,8 @@ const AdminDashboard: React.FC = () => {
         setError(null);
 
         const params = new URLSearchParams();
-        params.set("major", majorFilter);
+        if (majorFilter) params.set("majorId", majorFilter);
+        else if (schoolFilter) params.set("schoolId", schoolFilter);
         params.set("status", completionFilter);
 
         const data = await apiFetch<AdminCourseRow[]>(
@@ -121,11 +117,11 @@ const AdminDashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [majorFilter, completionFilter, refreshKey]);
+  }, [schoolFilter, majorFilter, completionFilter, refreshKey]);
 
   useEffect(() => {
     setEditing(null);
-  }, [majorFilter, completionFilter]);
+  }, [schoolFilter, majorFilter, completionFilter]);
 
   const filteredRows = useMemo(() => rows, [rows]);
 
@@ -146,6 +142,28 @@ const AdminDashboard: React.FC = () => {
             </span>
 
             <div className="filter-inline">
+              <label className="filter-label" htmlFor="school-select">
+                Select School:
+              </label>
+              <select
+                id="school-select"
+                className="filter-select"
+                value={schoolFilter}
+                onChange={(e) => {
+                  setSchoolFilter(e.target.value);
+                  setMajorFilter("");
+                }}
+              >
+                <option value="">All</option>
+                {schools.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-inline">
               <label className="filter-label" htmlFor="major-select">
                 Select Major:
               </label>
@@ -154,16 +172,14 @@ const AdminDashboard: React.FC = () => {
                 className="filter-select"
                 value={majorFilter}
                 onChange={(e) => setMajorFilter(e.target.value)}
+                disabled={!schoolFilter}
               >
-                {availableMajors.length > 0 ? (
-                  availableMajors.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))
-                ) : (
-                  <option>Loading...</option>
-                )}
+                <option value="">All</option>
+                {availableMajors.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
               </select>
             </div>
 

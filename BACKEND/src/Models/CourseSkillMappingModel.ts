@@ -1,4 +1,5 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { chunk, fetchAllPages } from "./CoursesModel.js";
 
 // Pull course + mapped skills (with type so we can split skills vs competencies)
 export async function getCourseMappings(courseId: number) {
@@ -26,6 +27,37 @@ export async function getCourseMappings(courseId: number) {
   }
 
   return { skills, competencies };
+}
+
+// Same split as getCourseMappings, for many courses in a few queries.
+export async function getMappingsForCourseIds(courseIds: number[]) {
+  const result = new Map<
+    number,
+    { skills: string[]; competencies: string[] }
+  >();
+  for (const id of courseIds) result.set(id, { skills: [], competencies: [] });
+
+  for (const ids of chunk(Array.from(new Set(courseIds)))) {
+    const rows = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("courses_skill_mapping")
+        .select("course_id, skill_id, skills(skill_name, type)")
+        .in("course_id", ids)
+        .order("course_id", { ascending: true })
+        .order("skill_id", { ascending: true })
+        .range(from, to),
+    );
+
+    for (const row of rows) {
+      const skill = row.skills;
+      const entry = result.get(row.course_id);
+      if (!skill?.skill_name || !entry) continue;
+      if (skill.type === true) entry.competencies.push(skill.skill_name);
+      else entry.skills.push(skill.skill_name);
+    }
+  }
+
+  return result;
 }
 
 export async function replaceCourseMappings(

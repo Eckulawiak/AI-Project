@@ -1,6 +1,8 @@
 import { type Request, type Response } from "express";
 import {
   getAllCourses,
+  getCoursesByIds,
+  getCourseIdsForMajors,
   getCourseById,
   updateCourse,
   findPairedCoursesByCodeAndProfessor,
@@ -16,43 +18,26 @@ import {
 } from "../Models/SkillsModel.js";
 import { findMajorByName } from "../Models/MajorModel.js";
 import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
+import { getMajorIdsForSchool } from "../Models/SchoolsModel.js";
+import { buildCourseRows } from "./courseRows.js";
 
-// GET /api/admin/courses
+// GET /api/admin/courses?schoolId=&majorId=&status=
 export const getAdminCourses = async (req: Request, res: Response) => {
   try {
-    const major = (req.query.major as string | undefined)?.trim();
+    const majorId = Number(req.query.majorId);
+    const schoolId = Number(req.query.schoolId);
     const status = (req.query.status as string | undefined)?.trim();
 
-    const courses = await getAllCourses();
+    let majorIds: number[] | null = null;
+    if (Number.isInteger(majorId) && majorId > 0) majorIds = [majorId];
+    else if (Number.isInteger(schoolId) && schoolId > 0)
+      majorIds = await getMajorIdsForSchool(schoolId);
 
-    const rows = await Promise.all(
-      courses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.course_id);
-        const completion =
-          skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
+    const courses = majorIds
+      ? await getCoursesByIds([...(await getCourseIdsForMajors(majorIds))])
+      : await getAllCourses();
 
-        return {
-          id: c.course_id,
-          course: c.course_code,
-          courseName: c.course_name,
-          altName: c.course_name_alt ?? null,
-          major: c.major,
-          professor: c.professor ?? "",
-          completion,
-          skills,
-          competencies,
-        };
-      }),
-    );
-
-    const filtered = rows.filter((r) => {
-      if (major && major !== "All" && major !== "" && r.major !== major)
-        return false;
-      if (status && status !== "All" && r.completion !== status) return false;
-      return true;
-    });
-
-    res.json(filtered);
+    res.json(await buildCourseRows(courses, status));
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });

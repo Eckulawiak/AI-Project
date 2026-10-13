@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import "./AddCourseMappingModal.css";
 import { clearSession, loadSession } from "./Session";
 import AutofillSkillBox from "./AutofillTextBox";
+import { useSchools } from "./hooks/useSchools";
 
 /**
  * Props required to render and operate the modal.
@@ -150,7 +151,11 @@ export default function AddCourseMappingModal({
   const [selectedMajor, setSelectedMajor] = useState<MajorOption>(
     "Software Engineering",
   );
-  const [formMajors, setFormMajors] = useState<string[]>([]);
+  const schools = useSchools();
+  const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
+  const formMajors =
+    schools.find((s) => s.id === selectedSchoolId)?.majors.map((m) => m.name) ??
+    [];
   const [prefixError, setPrefixError] = useState<string | null>(null);
 
   const parseSkillNames = (value: string): string[] =>
@@ -253,31 +258,17 @@ export default function AddCourseMappingModal({
     };
   }, []);
 
-  // ── Fetch majors for add form ─────────────────────────────────────────────
+  // ── Start on the school that holds the selected major ────────────────────
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const result = await apiFetch<Record<string, unknown>>(`/courses`);
-        const majors = Object.keys(result ?? {});
-
-        if (!cancelled) {
-          setFormMajors(majors);
-
-          if (majors.length > 0 && !majors.includes(selectedMajor)) {
-            setSelectedMajor(majors[0]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch majors:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedMajor]);
+    if (schools.length === 0 || selectedSchoolId !== null) return;
+    const school =
+      schools.find((s) => s.majors.some((m) => m.name === selectedMajor)) ??
+      schools[0];
+    setSelectedSchoolId(school.id);
+    if (!school.majors.some((m) => m.name === selectedMajor)) {
+      setSelectedMajor(school.majors[0]?.name ?? "");
+    }
+  }, [schools, selectedSchoolId, selectedMajor]);
 
   if (!isOpen) return null;
 
@@ -298,6 +289,32 @@ export default function AddCourseMappingModal({
 
               <form onSubmit={addCourse} className="add-form">
                 <select
+                  className="textbox faculty-input"
+                  aria-label="School"
+                  value={selectedSchoolId ?? ""}
+                  onChange={(e) => {
+                    const school = schools.find(
+                      (s) => s.id === Number(e.target.value),
+                    );
+                    const newMajor = school?.majors[0]?.name ?? "";
+                    setSelectedSchoolId(school?.id ?? null);
+                    setSelectedMajor(newMajor);
+                    validateCoursePrefix(courseCode, newMajor);
+                  }}
+                >
+                  {schools.length > 0 ? (
+                    schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option>Loading...</option>
+                  )}
+                </select>
+
+                <select
+                  aria-label="Major"
                   className="textbox faculty-input"
                   value={selectedMajor}
                   onChange={(e) => {
