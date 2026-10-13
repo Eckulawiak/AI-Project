@@ -4,6 +4,7 @@ import { findFacultyByEmail, findStudentByEmail } from "../Models/UserModel.js";
 import { verifyPassword, hashPassword } from "../Utils/password.js";
 import { signToken } from "../Utils/jwt.js";
 import { getMajors } from "../Models/MajorsModel.js";
+import { findMajorByName } from "../Models/MajorModel.js";
 import nodemailer from "nodemailer";
 
 // --- 1. LOGIN & LOGOUT ---
@@ -121,6 +122,8 @@ export const register = async (req: Request, res: Response) => {
         .status(409)
         .json({ error: "An account with this email already exists" });
 
+    const majorRow = major ? await findMajorByName(major) : null;
+
     const { data, error } = await supabase
       .from("student")
       .insert({
@@ -129,6 +132,7 @@ export const register = async (req: Request, res: Response) => {
         firstname: firstName,
         lastname: lastName,
         major: major,
+        major_id: majorRow?.id ?? null,
       })
       .select()
       .single();
@@ -140,14 +144,12 @@ export const register = async (req: Request, res: Response) => {
       userType: "Student",
       userEmail: data.student_qu_email,
     });
-    return res
-      .status(201)
-      .json({
-        token,
-        userId: data.student_id,
-        userType: "Student",
-        userEmail: data.student_qu_email,
-      });
+    return res.status(201).json({
+      token,
+      userId: data.student_id,
+      userType: "Student",
+      userEmail: data.student_qu_email,
+    });
   } else {
     const { data: existing } = await supabase
       .from("faculty_admin")
@@ -179,14 +181,12 @@ export const register = async (req: Request, res: Response) => {
       userType: "Faculty/Administrator",
       userEmail: data.faculty_qu_email,
     });
-    return res
-      .status(201)
-      .json({
-        token,
-        userId: data.faculty_id,
-        userType: "Faculty/Administrator",
-        userEmail: data.faculty_qu_email,
-      });
+    return res.status(201).json({
+      token,
+      userId: data.faculty_id,
+      userType: "Faculty/Administrator",
+      userEmail: data.faculty_qu_email,
+    });
   }
 };
 
@@ -206,8 +206,8 @@ async function sendResetEmail(toEmail: string, code: string): Promise<void> {
       pass: process.env.GMAIL_APP_PASSWORD,
     },
     tls: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   await transporter.sendMail({
@@ -362,7 +362,7 @@ export const getProfile = async (req: Request, res: Response) => {
     if (userType === "Student") {
       const { data, error } = await supabase
         .from("student")
-        .select("firstname, lastname, student_qu_email, major")
+        .select("firstname, lastname, student_qu_email, major, major_id")
         .eq("student_id", userId)
         .single();
       if (error || !data)
@@ -372,6 +372,7 @@ export const getProfile = async (req: Request, res: Response) => {
         lastName: data.lastname,
         email: data.student_qu_email,
         major: data.major,
+        majorId: data.major_id,
       });
     } else {
       const { data, error } = await supabase
@@ -415,7 +416,11 @@ export const updateProfile = async (req: Request, res: Response) => {
     if (password) updatePayload.password = await hashPassword(password);
 
     if (userType === "Student") {
-      if (major !== undefined) updatePayload.major = major.trim();
+      if (major !== undefined) {
+        updatePayload.major = major.trim();
+        updatePayload.major_id =
+          (await findMajorByName(major.trim()))?.id ?? null;
+      }
       const { error } = await supabase
         .from("student")
         .update(updatePayload)

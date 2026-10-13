@@ -23,6 +23,7 @@ import {
 } from "../Models/CoursesModel.js";
 import { findMajorByName } from "../Models/MajorModel.js";
 import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
+import { buildCourseRows } from "./courseRows.js";
 
 export { resolveOrCreateSkill } from "./AdminCourseController.js";
 
@@ -60,32 +61,7 @@ export const getCourses = async (req: Request, res: Response) => {
       return true;
     });
 
-    const rows = await Promise.all(
-      visibleCourses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.course_id);
-        const completion =
-          skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
-
-        return {
-          id: c.course_id,
-          course: c.course_code,
-          courseName: c.course_name,
-          altName: c.course_name_alt ?? null,
-          major: c.major,
-          professor: c.professor ?? "",
-          completion,
-          skills,
-          competencies,
-        };
-      }),
-    );
-
-    const filtered = rows.filter((r) => {
-      if (status && status !== "All" && r.completion !== status) return false;
-      return true;
-    });
-
-    res.json(filtered);
+    res.json(await buildCourseRows(visibleCourses, status));
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });
@@ -239,32 +215,7 @@ export const fetchUnassignedCourses = async (req: Request, res: Response) => {
     const status = (req.query.status as string | undefined)?.trim();
     const courses = await getUnassignedCourses();
 
-    const rows = await Promise.all(
-      courses.map(async (c) => {
-        const { skills, competencies } = await getCourseMappings(c.course_id);
-        const completion =
-          skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
-
-        return {
-          id: c.course_id,
-          course: c.course_code,
-          courseName: c.course_name,
-          altName: c.course_name_alt ?? null,
-          major: c.major,
-          professor: c.professor ?? "",
-          completion,
-          skills,
-          competencies,
-        };
-      }),
-    );
-
-    const filtered = rows.filter((r) => {
-      if (status && status !== "All" && r.completion !== status) return false;
-      return true;
-    });
-
-    res.json(filtered);
+    res.json(await buildCourseRows(courses, status));
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });
@@ -388,7 +339,8 @@ export const createNewCourse = async (
     const newCourse = await createCourse({
       courseCode,
       courseName,
-      major,
+      major: resolvedMajor.name,
+      majorId: resolvedMajor.id,
       professor: facultyFullName,
       ...(alternateCourseTitle ? { courseNameAlt: alternateCourseTitle } : {}),
     });

@@ -3,10 +3,11 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 import Footer from "./footer";
 import Navbar from "./Navbar";
-import "./FacultyDashboard.css";
+import "./facultyDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
 import AddCourseMappingModal from "./AddCourseMappingModal";
+import { useSchools } from "./hooks/useSchools";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ interface FacultyCourseRow {
   courseName: string;
   altName: string | null;
   major: string;
+  majorIds: number[];
+  schoolIds: number[];
   professor: string;
   completion: CompletionStatus;
   skills: string[];
@@ -72,6 +75,9 @@ const FacultyDashboard: React.FC = () => {
   // ── Filters ───────────────────────────────────────────────────────────────
   const [completionFilter, setCompletionFilter] =
     useState<CompletionFilter>("All");
+  const schools = useSchools();
+  // "" means All
+  const [schoolFilter, setSchoolFilter] = useState<string>("");
   const [majorFilter, setMajorFilter] = useState<string>("");
 
   // ── Table state ───────────────────────────────────────────────────────────
@@ -293,31 +299,17 @@ const FacultyDashboard: React.FC = () => {
     };
   }, [completionFilter, refreshKey]);
 
-  // ── Fetch majors for add form ─────────────────────────────────────────────
+  // ── Majors for add form ───────────────────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    const majors = schools.flatMap((school) =>
+      school.majors.map((m) => m.name),
+    );
+    setFormMajors(majors);
 
-    (async () => {
-      try {
-        const result = await apiFetch<Record<string, unknown>>(`/courses`);
-        const majors = Object.keys(result ?? {});
-
-        if (!cancelled) {
-          setFormMajors(majors);
-
-          if (majors.length > 0 && !majors.includes(selectedMajor)) {
-            setSelectedMajor(majors[0]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch majors:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedMajor]);
+    if (majors.length > 0 && !majors.includes(selectedMajor)) {
+      setSelectedMajor(majors[0]);
+    }
+  }, [schools, selectedMajor]);
 
   // ── Fetch competencies for add form ───────────────────────────────────────
   useEffect(() => {
@@ -349,28 +341,39 @@ const FacultyDashboard: React.FC = () => {
   // Close modal when filter changes
   useEffect(() => {
     setEditing(null);
-  }, [completionFilter, majorFilter]);
+  }, [completionFilter, schoolFilter, majorFilter]);
 
-  // Derive available majors from both row sets combined
-  const availableMajors = useMemo(
-    () => [...new Set([...rows, ...unassignedRows].map((r) => r.major))].sort(),
-    [rows, unassignedRows],
+  // Only offer schools and majors that have courses in either table
+  const { availableSchools, availableMajors } = useMemo(() => {
+    const all = [...rows, ...unassignedRows];
+    const schoolIds = new Set(all.flatMap((r) => r.schoolIds));
+    const majorIds = new Set(all.flatMap((r) => r.majorIds));
+    return {
+      availableSchools: schools.filter((s) => schoolIds.has(s.id)),
+      availableMajors: (
+        schools.find((s) => String(s.id) === schoolFilter)?.majors ?? []
+      ).filter((m) => majorIds.has(m.id)),
+    };
+  }, [rows, unassignedRows, schools, schoolFilter]);
+
+  // Apply school + major filters client-side to both tables
+  const matchesFilters = (r: FacultyCourseRow) => {
+    if (majorFilter) return r.majorIds.includes(Number(majorFilter));
+    if (schoolFilter) return r.schoolIds.includes(Number(schoolFilter));
+    return true;
+  };
+
+  const filteredRows = useMemo(
+    () => rows.filter(matchesFilters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, schoolFilter, majorFilter],
   );
 
-  // Apply major filter client-side to both tables
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      if (majorFilter && r.major !== majorFilter) return false;
-      return true;
-    });
-  }, [rows, majorFilter]);
-
-  const filteredUnassignedRows = useMemo(() => {
-    return unassignedRows.filter((r) => {
-      if (majorFilter && r.major !== majorFilter) return false;
-      return true;
-    });
-  }, [unassignedRows, majorFilter]);
+  const filteredUnassignedRows = useMemo(
+    () => unassignedRows.filter(matchesFilters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unassignedRows, schoolFilter, majorFilter],
+  );
 
   const [showAddCourseMappingModal, setShowAddCourseMappingModal] =
     useState(false);
@@ -418,6 +421,28 @@ const FacultyDashboard: React.FC = () => {
             </div>
 
             <div className="filter-inline">
+              <label className="filter-label" htmlFor="school-select">
+                School:
+              </label>
+              <select
+                id="school-select"
+                className="filter-select"
+                value={schoolFilter}
+                onChange={(e) => {
+                  setSchoolFilter(e.target.value);
+                  setMajorFilter("");
+                }}
+              >
+                <option value="">All</option>
+                {availableSchools.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-inline">
               <label className="filter-label" htmlFor="major-select">
                 Major:
               </label>
@@ -426,11 +451,12 @@ const FacultyDashboard: React.FC = () => {
                 className="filter-select"
                 value={majorFilter}
                 onChange={(e) => setMajorFilter(e.target.value)}
+                disabled={!schoolFilter}
               >
                 <option value="">All</option>
                 {availableMajors.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                  <option key={m.id} value={m.id}>
+                    {m.name}
                   </option>
                 ))}
               </select>

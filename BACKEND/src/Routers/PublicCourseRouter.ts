@@ -1,10 +1,14 @@
 import express from "express";
-import { getGroupedCourses } from "../Controllers/CourseController.js";
+import {
+  getMajorCourses,
+  getSchools,
+} from "../Controllers/CourseController.js";
 
 const router = express.Router();
 
-// Route: GET /courses/
-// This maps to the logic we just wrote in the controller
-router.get("/", getGroupedCourses);
+// Route: GET /courses/schools
+router.get("/schools", getSchools);
+// Route: GET /courses/majors/:majorId
+router.get("/majors/:majorId", getMajorCourses);
 
 export default router;

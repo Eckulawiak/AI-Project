@@ -1,4 +1,8 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { fetchAllPages } from "./CoursesModel.js";
+
+const COURSE_COLUMNS =
+  "course_id, course_code, course_name, course_name_alt, major, major_id, professor";
 
 // Return just the course IDs a faculty member owns via faculty_courses
 export async function getFacultyCourseIds(facultyId: number) {
@@ -47,9 +51,7 @@ export async function getVisibleCoursesForFaculty(
     // Courses where professor matches the faculty member's name
     supabase
       .from("courses")
-      .select(
-        "course_id, course_code, course_name, course_name_alt, major, professor",
-      )
+      .select(COURSE_COLUMNS)
       .ilike("professor", facultyFullName)
       .order("major", { ascending: true })
       .order("course_code", { ascending: true }),
@@ -57,9 +59,7 @@ export async function getVisibleCoursesForFaculty(
     // Courses where professor is blank / null
     supabase
       .from("courses")
-      .select(
-        "course_id, course_code, course_name, course_name_alt, major, professor",
-      )
+      .select(COURSE_COLUMNS)
       .or("professor.is.null,professor.eq.")
       .order("major", { ascending: true })
       .order("course_code", { ascending: true }),
@@ -73,9 +73,7 @@ export async function getVisibleCoursesForFaculty(
   if (ownedIds.length > 0) {
     const { data, error } = await supabase
       .from("courses")
-      .select(
-        "course_id, course_code, course_name, course_name_alt, major, professor",
-      )
+      .select(COURSE_COLUMNS)
       .in("course_id", ownedIds)
       .order("major", { ascending: true })
       .order("course_code", { ascending: true });
@@ -114,17 +112,16 @@ export async function getVisibleCoursesForFaculty(
  * or specifically labeled "N/A".
  */
 export async function getUnassignedCourses() {
-  const { data, error } = await supabase
-    .from("courses")
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
-    .or("professor.is.null,professor.eq.,professor.eq.N/A")
-    .order("major", { ascending: true })
-    .order("course_code", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  return fetchAllPages<any>((from, to) =>
+    supabase
+      .from("courses")
+      .select(COURSE_COLUMNS)
+      .or("professor.is.null,professor.eq.,professor.eq.N/A")
+      .order("major", { ascending: true })
+      .order("course_code", { ascending: true })
+      .order("course_id", { ascending: true })
+      .range(from, to),
+  );
 }
 
 export async function assignCourseToFaculty(

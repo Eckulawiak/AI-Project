@@ -13,6 +13,7 @@ type CourseRow = {
   course_name: string;
   course_name_alt?: string | null;
   major: string;
+  major_id?: number | null;
   professor?: string | null;
 };
 
@@ -42,59 +43,168 @@ function getPairedMajor(major: string) {
   return null;
 }
 
-export async function getAllCourses() {
-  const { data, error } = await supabase
-    .from("courses")
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
-    .order("major", { ascending: true })
-    .order("course_code", { ascending: true });
+const COURSE_COLUMNS =
+  "course_id, course_code, course_name, course_name_alt, major, major_id, professor";
 
-  if (error) throw error;
-  return data ?? [];
+// PostgREST caps each response (1000 rows by default), so page through.
+const PAGE_SIZE = 1000;
+// Keep .in() lists short enough to fit in a request URL.
+const IN_CHUNK = 200;
+
+export async function fetchAllPages<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: any }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    all.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return all;
+  }
 }
 
-// Returns courses grouped by course_code within a major.
-export async function getCoursesByMajor(major: string) {
-  const { data, error } = await supabase
-    .from("courses")
-    .select("course_id, course_code, course_name, course_name_alt")
-    .eq("major", major)
-    .order("course_code", { ascending: true });
+export function chunk<T>(items: T[], size = IN_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size));
+  return out;
+}
 
-  if (error) throw error;
+function sortCourses<T extends { major: string; course_code: string }>(
+  rows: T[],
+) {
+  return rows.sort(
+    (a, b) =>
+      a.major.localeCompare(b.major) ||
+      a.course_code.localeCompare(b.course_code),
+  );
+}
 
-  const groupMap: Record<
-    string,
-    {
-      courseName: string;
-      offerings: { id: string; altName: string | null }[];
-    }
-  > = {};
+export async function getAllCourses() {
+  const rows = await fetchAllPages<CourseRow>((from, to) =>
+    supabase
+      .from("courses")
+      .select(COURSE_COLUMNS)
+      .order("course_id", { ascending: true })
+      .range(from, to),
+  );
+  return sortCourses(rows);
+}
 
-  for (const row of data ?? []) {
-    const existing = groupMap[row.course_code];
+export async function getCoursesByIds(courseIds: number[]) {
+  const rows: CourseRow[] = [];
+  for (const ids of chunk(Array.from(new Set(courseIds)))) {
+    const { data, error } = await supabase
+      .from("courses")
+      .select(COURSE_COLUMNS)
+      .in("course_id", ids);
+    if (error) throw error;
+    rows.push(...((data ?? []) as CourseRow[]));
+  }
+  return sortCourses(rows);
+}
 
-    if (!existing) {
-      groupMap[row.course_code] = {
-        courseName: row.course_name ?? row.course_code,
-        offerings: [
-          {
-            id: String(row.course_id),
-            altName: row.course_name_alt ?? null,
-          },
-        ],
-      };
-    } else {
-      existing.offerings.push({
-        id: String(row.course_id),
-        altName: row.course_name_alt ?? null,
-      });
-    }
+// A course belongs to a major when courses.major_id points at it (the
+// major's own subject) or major_courses lists it as a requirement.
+export async function getCourseIdsForMajors(majorIds: number[]) {
+  const ids = new Set<number>();
+  if (majorIds.length === 0) return ids;
+
+  for (const group of chunk(majorIds)) {
+    const [owned, required] = await Promise.all([
+      fetchAllPages<{ course_id: number }>((from, to) =>
+        supabase
+          .from("courses")
+          .select("course_id")
+          .in("major_id", group)
+          .order("course_id", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllPages<{ course_id: number }>((from, to) =>
+        supabase
+          .from("major_courses")
+          .select("course_id")
+          .in("major_id", group)
+          .order("course_id", { ascending: true })
+          .range(from, to),
+      ),
+    ]);
+    for (const row of [...owned, ...required]) ids.add(row.course_id);
   }
 
-  return Object.entries(groupMap).map(([courseCode, value]) => ({
+  return ids;
+}
+
+// course id -> every major it belongs to (see getCourseIdsForMajors)
+export async function getMajorIdsForCourses(
+  courses: Array<{ course_id: number; major_id?: number | null }>,
+) {
+  const map = new Map<number, Set<number>>();
+  const add = (courseId: number, majorId: number) => {
+    if (!map.has(courseId)) map.set(courseId, new Set());
+    map.get(courseId)!.add(majorId);
+  };
+
+  for (const c of courses) if (c.major_id != null) add(c.course_id, c.major_id);
+
+  for (const ids of chunk(courses.map((c) => c.course_id))) {
+    const { data, error } = await supabase
+      .from("major_courses")
+      .select("course_id, major_id")
+      .in("course_id", ids);
+    if (error) throw error;
+    for (const row of data ?? []) add(row.course_id, row.major_id);
+  }
+
+  return map;
+}
+
+// Courses for one major, grouped by course_code. Rows that share a code
+// (special-topics alternate titles) come back as separate offerings.
+export async function getCoursesForMajor(majorId: number) {
+  const courseIds = await getCourseIdsForMajors([majorId]);
+  const base = await getCoursesByIds([...courseIds]);
+  const codes = Array.from(new Set(base.map((c) => c.course_code)));
+
+  const rows: CourseRow[] = [];
+  for (const group of chunk(codes)) {
+    const { data, error } = await supabase
+      .from("courses")
+      .select(COURSE_COLUMNS)
+      .in("course_code", group)
+      .eq("is_active", true);
+    if (error) throw error;
+    rows.push(...((data ?? []) as CourseRow[]));
+  }
+
+  rows.sort(
+    (a, b) =>
+      a.course_code.localeCompare(b.course_code) || a.course_id - b.course_id,
+  );
+
+  const groupMap = new Map<
+    string,
+    { courseName: string; offerings: { id: string; altName: string | null }[] }
+  >();
+
+  for (const row of rows) {
+    const offering = {
+      id: String(row.course_id),
+      altName: row.course_name_alt ?? null,
+    };
+    const existing = groupMap.get(row.course_code);
+    if (existing) existing.offerings.push(offering);
+    else
+      groupMap.set(row.course_code, {
+        courseName: row.course_name ?? row.course_code,
+        offerings: [offering],
+      });
+  }
+
+  return Array.from(groupMap, ([courseCode, value]) => ({
     courseCode,
     courseName: value.courseName,
     offerings: value.offerings,
@@ -104,9 +214,7 @@ export async function getCoursesByMajor(major: string) {
 export async function getCourseById(courseId: number) {
   const { data, error } = await supabase
     .from("courses")
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
+    .select(COURSE_COLUMNS)
     .eq("course_id", courseId)
     .single();
 
@@ -128,9 +236,7 @@ export async function updateCourse(courseId: number, updates: CourseUpdates) {
     .from("courses")
     .update(payload)
     .eq("course_id", courseId)
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
+    .select(COURSE_COLUMNS)
     .single();
 
   if (error) throw error;
@@ -153,9 +259,7 @@ export async function findPairedCoursesByCodeAndProfessor(
 
   const { data, error } = await supabase
     .from("courses")
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
+    .select(COURSE_COLUMNS)
     .eq("major", pairedMajor);
 
   if (error) throw error;
@@ -201,9 +305,7 @@ export async function updateCrossMajorMatchingCoursesByCodeAndProfessor(
     .from("courses")
     .update(payload)
     .in("course_id", ids)
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    );
+    .select(COURSE_COLUMNS);
 
   if (error) throw error;
   return (data ?? []) as CourseRow[];
@@ -211,16 +313,17 @@ export async function updateCrossMajorMatchingCoursesByCodeAndProfessor(
 
 export async function findCoursesByCode(courseCode: string) {
   const normalizedCode = normalizeCourseCode(courseCode);
+  const courseNumber = extractCourseNumber(courseCode);
 
-  const { data, error } = await supabase
-    .from("courses")
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    );
+  // Narrow by the trailing number in the DB; the table is too big to scan
+  // in one response.
+  let query = supabase.from("courses").select(COURSE_COLUMNS);
+  if (courseNumber) query = query.ilike("course_code", `%${courseNumber}`);
+  const data = await fetchAllPages<CourseRow>((from, to) =>
+    query.order("course_id", { ascending: true }).range(from, to),
+  );
 
-  if (error) throw error;
-
-  return (data ?? []).filter(
+  return data.filter(
     (row) => normalizeCourseCode(row.course_code ?? "") === normalizedCode,
   );
 }
@@ -230,6 +333,7 @@ export async function createCourse(input: {
   courseName: string;
   courseNameAlt?: string;
   major: string;
+  majorId?: number | null;
   professor?: string;
 }) {
   const payload = {
@@ -237,15 +341,14 @@ export async function createCourse(input: {
     course_name: input.courseName.trim(),
     course_name_alt: input.courseNameAlt?.trim() || null,
     major: input.major.trim(),
+    major_id: input.majorId ?? null,
     professor: input.professor?.trim() ?? "",
   };
 
   const { data, error } = await supabase
     .from("courses")
     .insert([payload])
-    .select(
-      "course_id, course_code, course_name, course_name_alt, major, professor",
-    )
+    .select(COURSE_COLUMNS)
     .single();
 
   if (error) throw error;

@@ -1,25 +1,26 @@
 import type { Request, Response } from "express";
-import { getAllCourses, getCoursesByMajor } from "../Models/CoursesModel.js";
+import { getCoursesForMajor } from "../Models/CoursesModel.js";
+import { getSchoolsWithMajors } from "../Models/SchoolsModel.js";
 
-export const getGroupedCourses = async (req: Request, res: Response) => {
+// GET /courses/schools -> [{ id, name, majors: [{ id, name }] }]
+export const getSchools = async (_req: Request, res: Response) => {
   try {
-    const courses = await getAllCourses();
-    const majors = [...new Set(courses.map((c) => c.major))].sort();
+    res.json(await getSchoolsWithMajors());
+  } catch (error) {
+    console.error("Error fetching schools:", error);
+    res.status(500).json({ error: "Failed to fetch schools" });
+  }
+};
 
-    const grouped: Record<
-      string,
-      {
-        courseCode: string;
-        courseName: string;
-        offerings: { id: string; altName: string | null }[];
-      }[]
-    > = {};
-
-    for (const major of majors) {
-      grouped[major] = await getCoursesByMajor(major);
+// GET /courses/majors/:majorId -> courses grouped by course_code
+export const getMajorCourses = async (req: Request, res: Response) => {
+  try {
+    const majorId = Number(req.params.majorId);
+    if (!Number.isInteger(majorId) || majorId <= 0) {
+      return res.status(400).json({ error: "Invalid majorId" });
     }
 
-    res.json(grouped);
+    res.json(await getCoursesForMajor(majorId));
   } catch (error) {
     console.error("Error fetching courses:", error);
     res.status(500).json({ error: "Failed to fetch courses" });
