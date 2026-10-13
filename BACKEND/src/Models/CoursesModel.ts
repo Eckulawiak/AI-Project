@@ -151,12 +151,17 @@ export async function getMajorIdsForCourses(
   for (const c of courses) if (c.major_id != null) add(c.course_id, c.major_id);
 
   for (const ids of chunk(courses.map((c) => c.course_id))) {
-    const { data, error } = await supabase
-      .from("major_courses")
-      .select("course_id, major_id")
-      .in("course_id", ids);
-    if (error) throw error;
-    for (const row of data ?? []) add(row.course_id, row.major_id);
+    const links = await fetchAllPages<{ course_id: number; major_id: number }>(
+      (from, to) =>
+        supabase
+          .from("major_courses")
+          .select("course_id, major_id")
+          .in("course_id", ids)
+          .order("course_id", { ascending: true })
+          .order("major_id", { ascending: true })
+          .range(from, to),
+    );
+    for (const row of links) add(row.course_id, row.major_id);
   }
 
   return map;
@@ -171,13 +176,16 @@ export async function getCoursesForMajor(majorId: number) {
 
   const rows: CourseRow[] = [];
   for (const group of chunk(codes)) {
-    const { data, error } = await supabase
-      .from("courses")
-      .select(COURSE_COLUMNS)
-      .in("course_code", group)
-      .eq("is_active", true);
-    if (error) throw error;
-    rows.push(...((data ?? []) as CourseRow[]));
+    const page = await fetchAllPages<CourseRow>((from, to) =>
+      supabase
+        .from("courses")
+        .select(COURSE_COLUMNS)
+        .in("course_code", group)
+        .eq("is_active", true)
+        .order("course_id", { ascending: true })
+        .range(from, to),
+    );
+    rows.push(...page);
   }
 
   rows.sort(
