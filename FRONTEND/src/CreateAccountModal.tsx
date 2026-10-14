@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { saveSession } from "./Session";
+import { useSchools } from "./hooks/useSchools";
 
 interface CreateAccountModalProps {
   showModal: boolean;
@@ -9,10 +10,11 @@ interface CreateAccountModalProps {
 }
 
 interface IFormInput {
-  userType: "Student" | "Faculty/Administrator";
+  userType: "Student" | "Faculty/Administrator" | "Administrator";
   firstName: string;
   lastName: string;
   email: string;
+  school?: string;
   major?: string;
   password: string;
   confirmPassword: string;
@@ -24,6 +26,9 @@ if (!API_BASE) {
   throw new Error("VITE_API_BASE_URL is not defined");
 }
 
+// Dev/testing only; the backend must also set ALLOW_ADMIN_SIGNUP=true
+const ALLOW_ADMIN_SIGNUP = import.meta.env.VITE_ALLOW_ADMIN_SIGNUP === "true";
+
 const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   showModal,
   onClose,
@@ -31,13 +36,14 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [majorsList, setMajorsList] = useState<string[]>([]); // State for the dropdown options
+  const schools = useSchools();
 
   const {
     register,
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<IFormInput>({
     defaultValues: {
@@ -45,6 +51,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       email: "",
       firstName: "",
       lastName: "",
+      school: "",
       major: "",
       password: "",
       confirmPassword: "",
@@ -53,19 +60,15 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
   const userType = watch("userType");
   const password = watch("password");
+  const school = watch("school");
 
-  // Fetch the list of majors when the modal opens
+  // Only the selected school's majors
+  const majorsList = schools.find((s) => String(s.id) === school)?.majors ?? [];
+
+  // A new school invalidates the previously picked major
   useEffect(() => {
-    if (showModal) {
-      fetch(`${API_BASE}/api/auth/majors`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to load majors");
-          return res.json();
-        })
-        .then((data) => setMajorsList(data))
-        .catch((err) => console.error("Error loading majors:", err));
-    }
-  }, [showModal]);
+    setValue("major", "");
+  }, [school, setValue]);
 
   const onSubmit: SubmitHandler<IFormInput> = async (data) => {
     setServerError("");
@@ -103,6 +106,8 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
       if (session.userType === "Student") {
         navigate("/studentdashboard");
+      } else if (session.userType === "Administrator") {
+        navigate("/adminDashboard");
       } else {
         navigate("/facultyAdmin");
       }
@@ -147,6 +152,9 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
                   <option value="Faculty/Administrator">
                     Faculty/Administrator
                   </option>
+                  {ALLOW_ADMIN_SIGNUP && (
+                    <option value="Administrator">Administrator</option>
+                  )}
                 </select>
               </div>
 
@@ -182,20 +190,48 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
                 )}
               </div>
 
+              {/* School Dropdown narrows the Major list */}
+              {userType === "Student" && (
+                <div className="mb-3">
+                  <select
+                    className={`form-select ${errors.school ? "is-invalid" : ""}`}
+                    {...register("school", {
+                      required:
+                        userType === "Student" ? "School is required" : false,
+                    })}
+                  >
+                    <option value="">Select School...</option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.school && (
+                    <div className="invalid-feedback">
+                      {errors.school.message}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Dynamic Major Dropdown */}
               {userType === "Student" && (
                 <div className="mb-3">
                   <select
                     className={`form-select ${errors.major ? "is-invalid" : ""}`}
+                    disabled={!school}
                     {...register("major", {
                       required:
                         userType === "Student" ? "Major is required" : false,
                     })}
                   >
-                    <option value="">Select Major...</option>
+                    <option value="">
+                      {school ? "Select Major..." : "Select a school first"}
+                    </option>
                     {majorsList.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
+                      <option key={m.id} value={m.name}>
+                        {m.name}
                       </option>
                     ))}
                   </select>
