@@ -151,6 +151,16 @@ export const register = async (req: Request, res: Response) => {
       userEmail: data.student_qu_email,
     });
   } else {
+    // Admin self-signup is for dev/testing only and must be switched on
+    // explicitly with ALLOW_ADMIN_SIGNUP=true.
+    const isAdmin = userType === "Administrator";
+    if (isAdmin && process.env.ALLOW_ADMIN_SIGNUP !== "true") {
+      return res
+        .status(403)
+        .json({ error: "Administrator sign-up is disabled" });
+    }
+    const sessionType = isAdmin ? "Administrator" : "Faculty/Administrator";
+
     const { data: existing } = await supabase
       .from("faculty_admin")
       .select("faculty_id")
@@ -169,7 +179,7 @@ export const register = async (req: Request, res: Response) => {
         password: hashedPassword,
         firstname: firstName,
         lastname: lastName,
-        type: false,
+        type: isAdmin,
       })
       .select()
       .single();
@@ -178,13 +188,13 @@ export const register = async (req: Request, res: Response) => {
 
     const token = signToken({
       userId: data.faculty_id,
-      userType: "Faculty/Administrator",
+      userType: sessionType,
       userEmail: data.faculty_qu_email,
     });
     return res.status(201).json({
       token,
       userId: data.faculty_id,
-      userType: "Faculty/Administrator",
+      userType: sessionType,
       userEmail: data.faculty_qu_email,
     });
   }

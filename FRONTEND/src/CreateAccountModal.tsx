@@ -10,7 +10,7 @@ interface CreateAccountModalProps {
 }
 
 interface IFormInput {
-  userType: "Student" | "Faculty/Administrator";
+  userType: "Student" | "Faculty/Administrator" | "Administrator";
   firstName: string;
   lastName: string;
   email: string;
@@ -25,6 +25,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 if (!API_BASE) {
   throw new Error("VITE_API_BASE_URL is not defined");
 }
+
+// Dev/testing only; the backend must also set ALLOW_ADMIN_SIGNUP=true
+const ALLOW_ADMIN_SIGNUP = import.meta.env.VITE_ALLOW_ADMIN_SIGNUP === "true";
 
 const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   showModal,
@@ -103,6 +106,8 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
       if (session.userType === "Student") {
         navigate("/studentdashboard");
+      } else if (session.userType === "Administrator") {
+        navigate("/adminDashboard");
       } else {
         navigate("/facultyAdmin");
       }
@@ -147,6 +152,9 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
                   <option value="Faculty/Administrator">
                     Faculty/Administrator
                   </option>
+                  {ALLOW_ADMIN_SIGNUP && (
+                    <option value="Administrator">Administrator</option>
+                  )}
                 </select>
               </div>
 
