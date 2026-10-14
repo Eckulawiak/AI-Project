@@ -28,12 +28,6 @@
   text-decoration: underline;
 }
 
-.nav-btn-active {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
-  font-weight: 700;
-}
 
 /* Style hamburger icon */
 .custom-toggle .navbar-toggler-icon {

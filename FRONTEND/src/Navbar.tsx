@@ -10,6 +10,12 @@ import ProgressStrip from "./components/ProgressStrip";
 // The roadmap has its own progress bar, and the assessment shouldn't be cluttered.
 const STRIP_PATHS = ["/studentdashboard", "/history"];
 
+const STUDENT_LINKS = [
+  { path: "/skill-assessment", label: "Skill Assessment" },
+  { path: "/roadmap", label: "Roadmap" },
+  { path: "/history", label: "History" },
+];
+
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [userType, setUserType] = useState<string | null>(null);
@@ -84,37 +90,19 @@ const Navbar: React.FC = () => {
           id="navbarContent"
         >
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-            {/* Student pages: skill assessment and roadmap */}
+            {/* Student pages. Like History, each link turns into "Dashboard"
+                while you're on that page, so you can always get back. */}
             {userType === "Student" &&
-              [
-                { path: "/skill-assessment", label: "Skill Assessment" },
-                { path: "/roadmap", label: "Roadmap" },
-              ].map((link) => (
+              STUDENT_LINKS.map((link) => (
                 <li className="nav-item" key={link.path}>
                   <button
-                    className={`nav-btn ${location.pathname === link.path ? "nav-btn-active" : ""}`}
-                    aria-current={location.pathname === link.path ? "page" : undefined}
-                    onClick={() => {
-                      navigate(link.path);
-                      setMenuOpen(false);
-                    }}
+                    className="nav-btn"
+                    onClick={() => handleToggleSubPage(link.path)}
                   >
-                    {link.label}
+                    {location.pathname === link.path ? "Dashboard" : link.label}
                   </button>
                 </li>
               ))}
-
-            {/* Student Navigation Toggle */}
-            {userType === "Student" && (
-              <li className="nav-item">
-                <button
-                  className="nav-btn"
-                  onClick={() => handleToggleSubPage("/history")}
-                >
-                  {location.pathname === "/history" ? "Dashboard" : "History"}
-                </button>
-              </li>
-            )}
 
             {/* Admin Navigation Toggle (checking both Admin and Administrator for DB safety) */}
             {(userType === "Administrator" || userType === "Admin") && (
