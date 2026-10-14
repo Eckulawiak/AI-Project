@@ -88,7 +88,17 @@ export async function saveTalkingPointsForStudent(
     .from("student_history")
     .insert(studentHistoryPayload);
 
-  if (joinInsertError) throw joinInsertError;
+  if (joinInsertError) {
+    // Roll back so a failed link doesn't leave history rows no student can see
+    await supabase
+      .from("history")
+      .delete()
+      .in(
+        "id",
+        historyRows.map((row) => row.id),
+      );
+    throw joinInsertError;
+  }
 
   return historyRows;
 }
