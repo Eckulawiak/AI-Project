@@ -4,6 +4,11 @@ import "./Navbar.css";
 import quLogo from "./assets/Qyellow_logo.png";
 import EditAccountModal from "./EditAccountModal";
 import { loadSession, clearSession } from "./Session";
+import ProgressStrip from "./components/ProgressStrip";
+
+// Pages that show the pull-down career progress strip under the navbar.
+// The roadmap has its own progress bar, and the assessment shouldn't be cluttered.
+const STRIP_PATHS = ["/studentdashboard", "/history"];
 
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
@@ -79,6 +84,26 @@ const Navbar: React.FC = () => {
           id="navbarContent"
         >
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
+            {/* Student pages: skill assessment and roadmap */}
+            {userType === "Student" &&
+              [
+                { path: "/skill-assessment", label: "Skill Assessment" },
+                { path: "/roadmap", label: "Roadmap" },
+              ].map((link) => (
+                <li className="nav-item" key={link.path}>
+                  <button
+                    className={`nav-btn ${location.pathname === link.path ? "nav-btn-active" : ""}`}
+                    aria-current={location.pathname === link.path ? "page" : undefined}
+                    onClick={() => {
+                      navigate(link.path);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+
             {/* Student Navigation Toggle */}
             {userType === "Student" && (
               <li className="nav-item">
@@ -119,6 +144,10 @@ const Navbar: React.FC = () => {
           </ul>
         </div>
       </nav>
+
+      {userType === "Student" && STRIP_PATHS.includes(location.pathname) && (
+        <ProgressStrip />
+      )}
 
       {showEditModal && userType && (
         <EditAccountModal

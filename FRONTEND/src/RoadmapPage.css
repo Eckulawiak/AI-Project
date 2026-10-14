@@ -1,0 +1,513 @@
+/* Career Roadmap page. Colors follow the existing navy (#131d43) and gold (#ffb718). */
+
+.roadmap-main {
+  max-width: 1200px;
+  color: #131d43;
+}
+
+.roadmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1rem;
+}
+
+.roadmap-title {
+  margin: 0;
+  text-align: left;
+}
+
+.roadmap-meta {
+  margin: 0.25rem 0 0;
+  color: #6b7280;
+}
+
+.roadmap-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Shared buttons (override the global button/link styles in index.css) */
+.rm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.rm-btn-primary {
+  background: #131d43 !important;
+  color: #ffb718 !important;
+}
+
+.rm-btn-primary:hover {
+  background: #1f2c5e !important;
+  color: #ffc94d !important;
+}
+
+.rm-btn-ghost {
+  background: #fff !important;
+  color: #131d43 !important;
+  border-color: #cfd4e2 !important;
+}
+
+.rm-btn-ghost:hover {
+  border-color: #131d43 !important;
+}
+
+.roadmap-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #fff7e0;
+  border: 1px solid #ffe2a0;
+  color: #5c4500;
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.roadmap-banner a {
+  color: #131d43;
+  text-decoration: underline;
+}
+
+/* Overall progress card — stays visible while scrolling (REQ-PROG-1) */
+.rm-progress-card {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(19, 29, 67, 0.08);
+  margin-bottom: 1rem;
+}
+
+.rm-progress-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.rm-progress-label {
+  display: block;
+  font-weight: 700;
+}
+
+.rm-progress-sub {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.rm-progress-pct {
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.rm-bar {
+  position: relative;
+  height: 14px;
+  background: #e8ebf3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rm-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #131d43, #2c3f86);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.rm-bar-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.rm-cat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.rm-cat-chip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 0.4rem;
+  row-gap: 0.3rem;
+  background: #f5f6fa;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.rm-cat-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rm-cat-pct {
+  font-weight: 700;
+}
+
+.rm-mini-bar {
+  grid-column: 1 / -1;
+  height: 5px;
+  background: #e1e5ef;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rm-mini-bar > div {
+  height: 100%;
+  background: #ffb718;
+  transition: width 0.5s ease;
+}
+
+/* Year filter */
+.rm-year-filter {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.rm-year-btn {
+  background: #fff !important;
+  border: 1px solid #cfd4e2 !important;
+  color: #131d43;
+  border-radius: 999px !important;
+  padding: 0.35rem 0.9rem !important;
+  font-size: 0.88rem !important;
+}
+
+.rm-year-btn.active {
+  background: #131d43 !important;
+  border-color: #131d43 !important;
+  color: #ffb718;
+}
+
+/* Tracks */
+.rm-tracks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 2rem;
+}
+
+.rm-track {
+  background: #fff;
+  border-radius: 16px;
+  padding: 0.9rem;
+  box-shadow: 0 2px 10px rgba(19, 29, 67, 0.06);
+}
+
+.rm-track-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 3px solid #ffb718;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rm-track-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  flex: 1;
+}
+
+.rm-track-pct {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.rm-year-group {
+  margin-top: 0.6rem;
+}
+
+.rm-year-heading {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin: 0 0 0.35rem;
+}
+
+.rm-empty {
+  font-size: 0.88rem;
+  color: #6b7280;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.rm-milestone {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  border: 1px solid #e3e6ef;
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+  margin-bottom: 0.4rem;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rm-milestone:hover,
+.rm-milestone.selected {
+  border-color: #131d43;
+}
+
+.rm-milestone.done {
+  background: #f3faf6;
+  border-color: #cde8d9;
+}
+
+.rm-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  border: 2px solid #9aa3bd !important;
+  background: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.rm-milestone.done .rm-check {
+  background: #2f9e6e !important;
+  border-color: #2f9e6e !important;
+}
+
+.rm-milestone-body {
+  flex: 1;
+  text-align: left;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: #131d43;
+  font-weight: 500;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.rm-milestone.done .rm-milestone-name {
+  color: #4b5563;
+  text-decoration: line-through;
+  text-decoration-color: #9aa3bd;
+}
+
+.rm-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #fff1cc;
+  color: #7a5800;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+/* Mobile tabs (hidden on desktop) */
+.rm-tabs {
+  display: none;
+}
+
+/* Detail panel */
+.rm-panel-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 29, 67, 0.25);
+  z-index: 1500;
+}
+
+.rm-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 100vw);
+  background: #fff;
+  z-index: 1501;
+  padding: 1.5rem 1.25rem;
+  box-shadow: -8px 0 30px rgba(19, 29, 67, 0.2);
+  overflow-y: auto;
+  color: #131d43;
+  animation: rm-slide-in 0.25s ease-out;
+}
+
+@keyframes rm-slide-in {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.rm-panel-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: transparent !important;
+  border: none !important;
+  color: #131d43;
+  padding: 0.3rem 0.5rem !important;
+}
+
+.rm-panel-cat {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.rm-panel-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0.25rem 2rem 0.5rem 0;
+}
+
+.rm-panel-desc {
+  color: #374151;
+}
+
+.rm-panel-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1rem;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+}
+
+.rm-panel-facts dt {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.rm-panel-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.rm-panel-sub {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.rm-comp-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.rm-comp {
+  background: #eef1f8;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.rm-panel-action {
+  width: 100%;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 991.98px) {
+  .rm-cat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rm-tabs {
+    display: flex;
+    gap: 0.3rem;
+    margin-bottom: 0.75rem;
+    overflow-x: auto;
+  }
+
+  .rm-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    background: #fff !important;
+    border: 1px solid #cfd4e2 !important;
+    color: #131d43;
+    border-radius: 10px !important;
+    padding: 0.45rem 0.3rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .rm-tab.active {
+    background: #131d43 !important;
+    border-color: #131d43 !important;
+    color: #ffb718;
+  }
+
+  .rm-tracks {
+    grid-template-columns: 1fr;
+  }
+
+  .rm-track {
+    display: none;
+  }
+
+  .rm-track.mobile-active {
+    display: block;
+  }
+
+  .rm-panel {
+    top: auto;
+    width: 100vw;
+    max-height: 80vh;
+    border-radius: 18px 18px 0 0;
+    animation-name: rm-slide-up;
+  }
+
+  @keyframes rm-slide-up {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+}
+
+@media (max-width: 575.98px) {
+  .roadmap-main {
+    max-width: 100%;
+    padding: 0.75rem 1rem;
+  }
+
+  .rm-progress-pct {
+    font-size: 1.4rem;
+  }
+}
+
+/* App.css centers #root text; these pages read better left-aligned. */
+.roadmap-main,
+.sa-main,
+.rm-panel {
+  text-align: left;
+}
