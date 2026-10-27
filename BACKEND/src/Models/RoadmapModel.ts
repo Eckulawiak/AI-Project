@@ -186,13 +186,11 @@ export async function getRoadmapCoursesForMajor(
   const byName = new Map(competencies.map((c) => [c.name, c]));
 
   // One entry per course code; alternate special-topics titles share it.
-  const seen = new Set<string>();
-  const result: RoadmapCourse[] = [];
+  // When several rows share a code, keep a mapped one so its skills show.
+  const byCode = new Map<string, RoadmapCourse>();
   for (const c of courses) {
-    if (seen.has(c.course_code)) continue;
-    seen.add(c.course_code);
     const m = mappings.get(c.course_id) ?? { skills: [], competencies: [] };
-    result.push({
+    const entry: RoadmapCourse = {
       courseId: c.course_id,
       courseCode: c.course_code,
       courseName: c.course_name,
@@ -201,8 +199,12 @@ export async function getRoadmapCoursesForMajor(
         .map((name) => byName.get(name))
         .filter((x): x is Competency => !!x),
       mapped: m.skills.length > 0 && m.competencies.length > 0,
-    });
+    };
+    const existing = byCode.get(c.course_code);
+    if (!existing || (!existing.mapped && entry.mapped))
+      byCode.set(c.course_code, entry);
   }
+  const result = [...byCode.values()];
 
   return result.sort((a, b) => a.courseCode.localeCompare(b.courseCode));
 }
