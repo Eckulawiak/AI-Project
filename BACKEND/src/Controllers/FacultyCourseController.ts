@@ -4,6 +4,7 @@ import {
   replaceCourseMappings,
   replaceMappingsForCourseIds,
 } from "../Models/CourseSkillMappingModel.js";
+import { resolveFlagsForMappedCourses } from "../Models/UnmappedFlagsModel.js";
 import {
   getAllSkillsAndCompetencies,
   findSkillByName,
@@ -160,6 +161,7 @@ export const updateCourseMapping = async (
     const allCourseIdsToReplace = [courseId, ...syncedVisibleCourseIds];
 
     await replaceMappingsForCourseIds(allCourseIdsToReplace, uniqueIds);
+    await resolveFlagsForMappedCourses(allCourseIdsToReplace);
     const updated = await getCourseMappings(courseId);
 
     res.json({

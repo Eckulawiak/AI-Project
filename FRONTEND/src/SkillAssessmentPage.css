@@ -215,6 +215,12 @@
   padding: 0.1rem 0.55rem;
 }
 
+.sa-skill-tags span.sa-unmapped {
+  background: #fff7e0;
+  color: #5c4500;
+  font-style: italic;
+}
+
 /* Ratings */
 .sa-rating-list {
   display: flex;

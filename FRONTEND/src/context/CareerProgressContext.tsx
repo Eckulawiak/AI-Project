@@ -1,183 +1,156 @@
 // Shared state for the roadmap, the progress strip and the skill assessment.
-// Uses the fake data in mock/careerData.ts and keeps it in sessionStorage so a
-// demo survives a page refresh. Swap these actions for API calls later.
+// Loads the signed-in student's roadmap from the API, ticks milestones off
+// optimistically and rolls back if the server refuses (SDS Figure 7).
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  BASE_MILESTONES,
-  GAP_MILESTONES,
-  MOCK_PROFILE,
-  type AssessmentResult,
-  type Category,
-  type Milestone,
-  type StudentProfile,
-} from "../mock/careerData";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import type {
+  AssessmentSubmission,
+  Milestone,
+  RoadmapResponse,
+} from "../career/careerData";
 import Celebration from "../components/Celebration";
+import { loadSession } from "../Session";
+import * as careerApi from "../services/careerApi";
 import {
   CareerProgressContext,
-  THRESHOLDS,
   computeProgress,
+  crossedThreshold,
   type CareerProgressValue,
   type CelebrationEvent,
 } from "./careerProgress";
 
-const STORAGE_KEY = "qu_demo_career_progress";
-
-interface StoredState {
-  profile: StudentProfile;
-  milestones: Milestone[];
-  assessment: AssessmentResult | null;
-}
-
-const initialState = (): StoredState => ({
-  profile: MOCK_PROFILE,
-  milestones: BASE_MILESTONES.map((x) => ({ ...x })),
-  assessment: null,
-});
-
-function loadState(): StoredState {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as StoredState;
-  } catch {
-    /* storage unavailable or corrupt — fall back to defaults */
-  }
-  return initialState();
-}
-
 const YEAR_ORDER = { FIRST: 0, SOPH: 1, JUNIOR: 2, SENIOR: 3 } as const;
+
+const errorText = (e: unknown) =>
+  e instanceof Error ? e.message : "Something went wrong. Please try again.";
 
 export const CareerProgressProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [state, setState] = useState<StoredState>(loadState);
+  const location = useLocation();
+  const [data, setData] = useState<RoadmapResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [celebration, setCelebration] = useState<CelebrationEvent | null>(null);
+  // The session token the current data belongs to.
+  const loadedFor = useRef<string | null>(null);
 
-  useEffect(() => {
+  const milestones = useMemo(() => data?.milestones ?? [], [data]);
+
+  const load = useCallback(async (request: () => Promise<RoadmapResponse>) => {
+    setLoading(true);
+    setError("");
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
+      setData(await request());
+    } catch (e) {
+      setError(errorText(e));
+      throw e;
+    } finally {
+      setLoading(false);
     }
-  }, [state]);
+  }, []);
 
-  const progress = useMemo(() => computeProgress(state.milestones), [state.milestones]);
+  // Load once per student session; clear when someone else signs in.
+  useEffect(() => {
+    const session = loadSession();
+    const token = session?.userType === "Student" ? session.token : null;
+    if (token === loadedFor.current) return;
+    loadedFor.current = token;
+    setData(null);
+    if (token) load(careerApi.getRoadmap).catch(() => {});
+  }, [location.pathname, load]);
+
+  const progress = useMemo(() => computeProgress(milestones), [milestones]);
 
   const nextMilestones = useMemo(
     () =>
-      state.milestones
+      milestones
         .filter((x) => x.status === "PENDING")
         .sort((a, b) => YEAR_ORDER[a.classYear] - YEAR_ORDER[b.classYear])
         .slice(0, 3),
-    [state.milestones],
+    [milestones],
+  );
+
+  const replaceMilestone = useCallback(
+    (id: number, update: (m: Milestone) => Milestone) =>
+      setData((d) =>
+        d ? { ...d, milestones: d.milestones.map((x) => (x.id === id ? update(x) : x)) } : d,
+      ),
+    [],
   );
 
   const toggleMilestone = useCallback(
-    (id: string) => {
-      const before = computeProgress(state.milestones).overall;
-      const target = state.milestones.find((x) => x.id === id);
+    (id: number) => {
+      const target = milestones.find((x) => x.id === id);
       if (!target) return;
-      const nowComplete = target.status === "PENDING";
-      const milestones: Milestone[] = state.milestones.map((x) =>
-        x.id === id ? { ...x, status: nowComplete ? "COMPLETE" : "PENDING" } : x,
-      );
-      setState({ ...state, milestones });
+      const previous = target.status;
+      const nowComplete = previous === "PENDING";
+      const status = nowComplete ? "COMPLETE" : "PENDING";
 
-      if (!nowComplete) return; // unchecking never celebrates
-      const after = computeProgress(milestones).overall;
-      const crossed = [...THRESHOLDS].reverse().find((t) => before < t && after >= t);
-      setCelebration(
-        crossed
-          ? {
-              kind: "threshold",
-              title: crossed === 100 ? "Roadmap complete!" : `You're ${crossed}% career ready!`,
-              message:
-                crossed === 100
-                  ? "You finished every milestone on your roadmap."
-                  : `Nice work — you just passed ${crossed}% overall.`,
-              key: Date.now(),
-            }
-          : {
-              kind: "milestone",
-              title: "Milestone complete",
-              message: target.name,
-              key: Date.now(),
-            },
-      );
-    },
-    [state],
-  );
+      // Optimistic update
+      const before = computeProgress(milestones).overall;
+      const after = computeProgress(
+        milestones.map((x) => (x.id === id ? { ...x, status } : x)),
+      ).overall;
+      replaceMilestone(id, (m) => ({ ...m, status }));
+      setError("");
 
-  const applyAssessment = useCallback(
-    (result: AssessmentResult) => {
-      const previous = new Map(state.milestones.map((x) => [x.id, x.status]));
-
-      // Start from the base roadmap, keeping what was already checked off.
-      let milestones: Milestone[] = BASE_MILESTONES.map((x) => ({
-        ...x,
-        status: previous.get(x.id) ?? x.status,
-      }));
-
-      // Courses the student marked as completed are ticked off.
-      milestones = milestones.map((x) =>
-        x.courseCode && result.completedCourses.includes(x.courseCode)
-          ? { ...x, status: "COMPLETE" }
-          : x,
-      );
-
-      // Weak competencies (rated 1 or 2) add a targeted milestone.
-      for (const [id, rating] of Object.entries(result.ratings)) {
-        const gap = GAP_MILESTONES[Number(id)];
-        if (gap && rating <= 2) {
-          milestones.push({ ...gap, status: previous.get(gap.id) ?? "PENDING" });
-        }
+      if (nowComplete) {
+        const crossed = crossedThreshold(before, after);
+        setCelebration(
+          crossed
+            ? {
+                kind: "threshold",
+                title: crossed === 100 ? "Roadmap complete!" : `You're ${crossed}% career ready!`,
+                message:
+                  crossed === 100
+                    ? "You finished every milestone on your roadmap."
+                    : `Nice work — you just passed ${crossed}% overall.`,
+                key: Date.now(),
+              }
+            : {
+                kind: "milestone",
+                title: "Milestone complete",
+                message: target.name,
+                key: Date.now(),
+              },
+        );
       }
 
-      // Experience the student already has becomes completed milestones.
-      const kindToCategory: Record<string, Category> = {
-        INTERNSHIP: "EXPERIENCE",
-        JOB: "EXPERIENCE",
-        CERT: "CERT",
-        PROJECT: "SKILL",
-      };
-      for (const e of result.experience) {
-        milestones.push({
-          id: `x-${e.id}`,
-          name: e.title,
-          description: "Added from your skill assessment.",
-          category: kindToCategory[e.kind],
-          classYear: result.profile.classYear,
-          competencyIds: [],
-          status: "COMPLETE",
+      careerApi
+        .setMilestoneStatus(id, status)
+        .then((res) => replaceMilestone(id, () => res.milestone))
+        .catch((e) => {
+          replaceMilestone(id, (m) => ({ ...m, status: previous }));
+          setCelebration(null);
+          setError(`Couldn't save "${target.name}". ${errorText(e)}`);
         });
-        if (e.kind === "INTERNSHIP") {
-          milestones = milestones.map((x) =>
-            x.id === "e-intern" || x.id === "e-intern-apply"
-              ? { ...x, status: "COMPLETE" }
-              : x,
-          );
-        }
-      }
-
-      setState({ profile: result.profile, milestones, assessment: result });
     },
-    [state.milestones],
+    [milestones, replaceMilestone],
   );
 
-  const resetDemo = useCallback(() => {
-    setState(initialState());
-    setCelebration(null);
-  }, []);
+  const submitAssessment = useCallback(
+    (body: AssessmentSubmission) => load(() => careerApi.submitAssessment(body)),
+    [load],
+  );
+
+  const regenerate = useCallback(() => load(careerApi.regenerateRoadmap), [load]);
+  const refresh = useCallback(() => load(careerApi.getRoadmap), [load]);
 
   const value: CareerProgressValue = {
-    profile: state.profile,
-    milestones: state.milestones,
-    assessment: state.assessment,
+    loading,
+    error,
+    profile: data?.profile ?? null,
+    roadmap: data?.roadmap ?? null,
+    lastAssessmentAt: data?.lastAssessmentAt ?? null,
+    milestones,
     progress,
     nextMilestones,
     toggleMilestone,
-    applyAssessment,
-    resetDemo,
+    submitAssessment,
+    regenerate,
+    refresh,
     celebration,
     dismissCelebration: () => setCelebration(null),
   };

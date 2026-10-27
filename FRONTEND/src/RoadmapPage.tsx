@@ -6,24 +6,31 @@ import { useCareerProgress } from "./context/careerProgress";
 import {
   CATEGORIES,
   CLASS_YEARS,
-  NACE_COMPETENCIES,
   type Category,
   type ClassYear,
   type Milestone,
-} from "./mock/careerData";
+} from "./career/careerData";
 import "./studentDashboard.css";
 import "./RoadmapPage.css";
 
 const yearLabel = (y: ClassYear) => CLASS_YEARS.find((c) => c.id === y)?.label ?? y;
-const goalLabel = (g: string) => (g === "GRAD" ? "Graduate school" : "Industry");
-const fromAssessment = (m: Milestone) => m.id.startsWith("g-") || m.id.startsWith("x-");
+const goalLabel = (g: string | null) => (g === "GRAD" ? "Graduate school" : "Industry");
+const fromAssessment = (m: Milestone) => m.source === "GAP" || m.source === "EXPERIENCE";
 
 const RoadmapPage: React.FC = () => {
-  const { profile, milestones, progress, assessment, toggleMilestone, resetDemo } =
-    useCareerProgress();
+  const {
+    loading,
+    error,
+    profile,
+    milestones,
+    progress,
+    lastAssessmentAt,
+    toggleMilestone,
+    regenerate,
+  } = useCareerProgress();
   const [yearFilter, setYearFilter] = useState<ClassYear | "ALL">("ALL");
   const [mobileTab, setMobileTab] = useState<Category>("COURSE");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const selected = milestones.find((x) => x.id === selectedId) ?? null;
   const total = milestones.length;
@@ -49,27 +56,55 @@ const RoadmapPage: React.FC = () => {
         <section className="roadmap-header">
           <div>
             <h1 className="dashboard-title roadmap-title">Your Career Roadmap</h1>
-            <p className="roadmap-meta">
-              {profile.major} · {yearLabel(profile.classYear)} · Goal:{" "}
-              {profile.careerGoal} ({goalLabel(profile.goalType)})
-            </p>
+            {profile && (
+              <p className="roadmap-meta">
+                {[
+                  profile.major ?? "No major set",
+                  profile.classYear && yearLabel(profile.classYear),
+                  profile.careerGoal &&
+                    `Goal: ${profile.careerGoal} (${goalLabel(profile.goalType)})`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
           </div>
           <div className="roadmap-actions">
             <Link to="/skill-assessment" className="rm-btn rm-btn-primary">
               <i className="bi bi-clipboard-check" />{" "}
-              {assessment ? "Retake assessment" : "Take skill assessment"}
+              {lastAssessmentAt ? "Retake assessment" : "Take skill assessment"}
             </Link>
-            <button type="button" className="rm-btn rm-btn-ghost" onClick={resetDemo}>
-              Reset demo
+            <button
+              type="button"
+              className="rm-btn rm-btn-ghost"
+              onClick={() => regenerate().catch(() => {})}
+              disabled={loading}
+              title="Rebuild pending milestones from your major and goal. Completed ones are kept."
+            >
+              <i className="bi bi-arrow-clockwise" /> Refresh roadmap
             </button>
           </div>
         </section>
 
-        {!assessment && (
+        {error && (
+          <div className="roadmap-banner roadmap-banner-error" role="alert">
+            <i className="bi bi-exclamation-circle" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {loading && milestones.length === 0 && (
+          <div className="roadmap-banner" role="status">
+            <i className="bi bi-hourglass-split" />
+            <span>Building your roadmap…</span>
+          </div>
+        )}
+
+        {!loading && !lastAssessmentAt && (
           <div className="roadmap-banner">
             <i className="bi bi-info-circle" />
             <span>
-              This is a sample roadmap.{" "}
+              This roadmap uses your major's courses and a standard plan.{" "}
               <Link to="/skill-assessment">Take the skill assessment</Link> to
               personalize it.
             </span>
@@ -240,13 +275,13 @@ const RoadmapPage: React.FC = () => {
               <dd>{selected.status === "COMPLETE" ? "Complete" : "Not started"}</dd>
             </dl>
 
-            {selected.competencyIds.length > 0 && (
+            {selected.competencies.length > 0 && (
               <>
                 <h3 className="rm-panel-sub">Builds these NACE competencies</h3>
                 <div className="rm-comp-list">
-                  {selected.competencyIds.map((id) => (
-                    <span key={id} className="rm-comp">
-                      {NACE_COMPETENCIES.find((n) => n.id === id)?.name}
+                  {selected.competencies.map((c) => (
+                    <span key={c.id} className="rm-comp">
+                      {c.name}
                     </span>
                   ))}
                 </div>

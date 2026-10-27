@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCareerProgress } from "../context/careerProgress";
-import { CATEGORIES } from "../mock/careerData";
+import { CATEGORIES } from "../career/careerData";
 import "./ProgressStrip.css";
 
 // Slim career-readiness bar under the navbar. Click it to pull down the

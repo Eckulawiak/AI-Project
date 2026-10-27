@@ -1,22 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./footer";
 import { useCareerProgress } from "./context/careerProgress";
+import { useSchools } from "./hooks/useSchools";
+import { getAssessmentOptions, getMyAssessment } from "./services/careerApi";
 import {
   CLASS_YEARS,
-  MOCK_COURSES,
-  MOCK_SCHOOLS,
-  NACE_COMPETENCIES,
   RATING_LABELS,
+  competencyBlurb,
+  type AssessmentCourse,
+  type ClassYear,
+  type Competency,
+  type CourseStatus,
   type ExperienceEntry,
-  type StudentProfile,
-} from "./mock/careerData";
+  type GoalType,
+} from "./career/careerData";
 import "./studentDashboard.css";
 import "./RoadmapPage.css";
 import "./SkillAssessmentPage.css";
-
-type CourseStatus = "NONE" | "IN_PROGRESS" | "DONE";
 
 const STEPS = ["About you", "Coursework", "Self-rating", "Experience", "Results"];
 
@@ -27,57 +29,109 @@ const EXPERIENCE_KINDS: { id: ExperienceEntry["kind"]; label: string }[] = [
   { id: "PROJECT", label: "Project" },
 ];
 
+interface ProfileForm {
+  schoolId: number | null;
+  majorId: number | null;
+  classYear: ClassYear | "";
+  careerGoal: string;
+  goalType: GoalType;
+}
+
+type ListedExperience = ExperienceEntry & { id: string };
+
 const SkillAssessmentPage: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    profile: savedProfile,
-    assessment,
-    milestones,
-    applyAssessment,
-  } = useCareerProgress();
+  const { profile: savedProfile, submitAssessment } = useCareerProgress();
+  const schools = useSchools();
 
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Pre-fill from the last assessment or the (fake) profile.
-  const [profile, setProfile] = useState<StudentProfile>(
-    assessment?.profile ?? savedProfile,
-  );
-  const [courses, setCourses] = useState<Record<string, CourseStatus>>(() => {
-    // Start from what the roadmap already shows as complete.
-    const doneOnRoadmap = new Set(
-      milestones
-        .filter((x) => x.courseCode && x.status === "COMPLETE")
-        .map((x) => x.courseCode),
-    );
-    const init: Record<string, CourseStatus> = {};
-    for (const c of MOCK_COURSES) {
-      init[c.code] = doneOnRoadmap.has(c.code)
-        ? "DONE"
-        : assessment?.inProgressCourses.includes(c.code)
-          ? "IN_PROGRESS"
-          : "NONE";
-    }
-    return init;
+  const [profile, setProfile] = useState<ProfileForm>({
+    schoolId: null,
+    majorId: null,
+    classYear: "",
+    careerGoal: "",
+    goalType: "INDUSTRY",
   });
-  const [ratings, setRatings] = useState<Record<number, number>>(
-    assessment?.ratings ?? {},
-  );
-  const [experience, setExperience] = useState<ExperienceEntry[]>(
-    assessment?.experience ?? [],
-  );
+  const [competencies, setCompetencies] = useState<Competency[]>([]);
+  const [courseList, setCourseList] = useState<AssessmentCourse[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [courses, setCourses] = useState<Record<number, CourseStatus>>({});
+  const [ratings, setRatings] = useState<Record<number, number>>({});
+  const [experience, setExperience] = useState<ListedExperience[]>([]);
   const [newKind, setNewKind] = useState<ExperienceEntry["kind"]>("INTERNSHIP");
   const [newTitle, setNewTitle] = useState("");
 
-  const majors = MOCK_SCHOOLS[profile.school] ?? [];
+  // Pre-fill from the saved profile once it arrives.
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (prefilled || !savedProfile) return;
+    setPrefilled(true);
+    setProfile((p) => ({
+      schoolId: savedProfile.schoolId ?? p.schoolId,
+      majorId: savedProfile.majorId ?? p.majorId,
+      classYear: savedProfile.classYear ?? p.classYear,
+      careerGoal: savedProfile.careerGoal ?? p.careerGoal,
+      goalType: savedProfile.goalType ?? p.goalType,
+    }));
+  }, [savedProfile, prefilled]);
+
+  // ... and ratings and experience from the last assessment.
+  useEffect(() => {
+    getMyAssessment()
+      .then((last) => {
+        if (!last) return;
+        setRatings(
+          Object.fromEntries(
+            Object.entries(last.ratings).map(([id, r]) => [Number(id), Number(r)]),
+          ),
+        );
+        setExperience(last.experience.map((e, i) => ({ ...e, id: `saved-${i}` })));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Courses (with mapped skills and saved status) for the chosen major.
+  useEffect(() => {
+    if (!profile.majorId) {
+      setCourseList([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCourses(true);
+    getAssessmentOptions(profile.majorId)
+      .then((opts) => {
+        if (cancelled) return;
+        setCompetencies(opts.competencies);
+        setCourseList(opts.courses);
+        setCourses((prev) => {
+          const next: Record<number, CourseStatus> = {};
+          for (const c of opts.courses) next[c.courseId] = prev[c.courseId] ?? c.status;
+          return next;
+        });
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => !cancelled && setLoadingCourses(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.majorId]);
+
+  const majors = useMemo(
+    () => schools.find((s) => s.id === profile.schoolId)?.majors ?? [],
+    [schools, profile.schoolId],
+  );
 
   const validate = (): string => {
     if (step === 0) {
-      if (!profile.major) return "Please choose your major.";
+      if (!profile.majorId) return "Please choose your major.";
+      if (!profile.classYear) return "Please choose your class year.";
       if (!profile.careerGoal.trim()) return "Please enter a career goal.";
     }
     if (step === 2) {
-      const missing = NACE_COMPETENCIES.filter((n) => !ratings[n.id]);
+      const missing = competencies.filter((n) => !ratings[n.id]);
       if (missing.length)
         return `Please rate every competency (${missing.length} left).`;
     }
@@ -107,29 +161,40 @@ const SkillAssessmentPage: React.FC = () => {
     setNewTitle("");
   };
 
-  const completed = Object.entries(courses)
-    .filter(([, s]) => s === "DONE")
-    .map(([c]) => c);
-  const inProgress = Object.entries(courses)
-    .filter(([, s]) => s === "IN_PROGRESS")
-    .map(([c]) => c);
+  const completed = courseList.filter((c) => courses[c.courseId] === "COMPLETED");
+  const inProgress = courseList.filter((c) => courses[c.courseId] === "IN_PROGRESS");
 
-  const strengths = NACE_COMPETENCIES.filter((n) => (ratings[n.id] ?? 0) >= 3);
-  const growth = NACE_COMPETENCIES.filter((n) => (ratings[n.id] ?? 0) <= 2);
-  const courseSkills = MOCK_COURSES.filter((c) => completed.includes(c.code)).flatMap(
-    (c) => c.skills,
-  );
+  const strengths = competencies.filter((n) => (ratings[n.id] ?? 0) >= 3);
+  const growth = competencies.filter((n) => (ratings[n.id] ?? 0) <= 2);
+  const courseSkills = Array.from(new Set(completed.flatMap((c) => c.skills)));
 
-  const finish = () => {
-    applyAssessment({
-      profile,
-      completedCourses: completed,
-      inProgressCourses: inProgress,
-      ratings,
-      experience,
-      completedAt: new Date().toISOString(),
-    });
-    navigate("/roadmap");
+  const finish = async () => {
+    if (!profile.majorId || !profile.classYear) return;
+    setSaving(true);
+    setError("");
+    try {
+      await submitAssessment({
+        profile: {
+          majorId: profile.majorId,
+          classYear: profile.classYear,
+          careerGoal: profile.careerGoal.trim(),
+          goalType: profile.goalType,
+        },
+        courses: courseList.map((c) => ({
+          courseId: c.courseId,
+          status: courses[c.courseId] ?? "NONE",
+        })),
+        ratings: Object.fromEntries(
+          Object.entries(ratings).map(([id, r]) => [String(id), r]),
+        ),
+        experience: experience.map(({ kind, title }) => ({ kind, title })),
+      });
+      navigate("/roadmap");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save your assessment.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -168,25 +233,39 @@ const SkillAssessmentPage: React.FC = () => {
                 <label className="sa-field">
                   <span>School</span>
                   <select
-                    value={profile.school}
+                    value={profile.schoolId ?? ""}
                     onChange={(e) =>
-                      setProfile({ ...profile, school: e.target.value, major: "" })
+                      setProfile({
+                        ...profile,
+                        schoolId: e.target.value ? Number(e.target.value) : null,
+                        majorId: null,
+                      })
                     }
                   >
-                    {Object.keys(MOCK_SCHOOLS).map((s) => (
-                      <option key={s}>{s}</option>
+                    <option value="">Choose a school</option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
                     ))}
                   </select>
                 </label>
                 <label className="sa-field">
                   <span>Major</span>
                   <select
-                    value={profile.major}
-                    onChange={(e) => setProfile({ ...profile, major: e.target.value })}
+                    value={profile.majorId ?? ""}
+                    onChange={(e) =>
+                      setProfile({
+                        ...profile,
+                        majorId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
                   >
                     <option value="">Choose a major</option>
                     {majors.map((m) => (
-                      <option key={m}>{m}</option>
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -197,10 +276,11 @@ const SkillAssessmentPage: React.FC = () => {
                     onChange={(e) =>
                       setProfile({
                         ...profile,
-                        classYear: e.target.value as StudentProfile["classYear"],
+                        classYear: e.target.value as ClassYear | "",
                       })
                     }
                   >
+                    <option value="">Choose a year</option>
                     {CLASS_YEARS.map((y) => (
                       <option key={y.id} value={y.id}>
                         {y.label}
@@ -233,7 +313,7 @@ const SkillAssessmentPage: React.FC = () => {
                       name="goalType"
                       checked={profile.goalType === g.id}
                       onChange={() =>
-                        setProfile({ ...profile, goalType: g.id as StudentProfile["goalType"] })
+                        setProfile({ ...profile, goalType: g.id as GoalType })
                       }
                     />
                     {g.label}
@@ -250,31 +330,41 @@ const SkillAssessmentPage: React.FC = () => {
                 Mark the courses you have finished or are taking now. We use the
                 skills your faculty mapped to each course.
               </p>
+              {loadingCourses && <p className="sa-empty">Loading your major's courses…</p>}
+              {!loadingCourses && courseList.length === 0 && (
+                <p className="sa-empty">
+                  No courses are listed for this major yet. You can skip this step.
+                </p>
+              )}
               <div className="sa-course-list">
-                {MOCK_COURSES.map((c) => (
-                  <div key={c.code} className="sa-course">
+                {courseList.map((c) => (
+                  <div key={c.courseId} className="sa-course">
                     <div className="sa-course-info">
-                      <strong>{c.code}</strong> {c.name}
+                      <strong>{c.courseCode}</strong> {c.courseName}
                       <div className="sa-skill-tags">
-                        {c.skills.map((s) => (
-                          <span key={s}>{s}</span>
-                        ))}
+                        {c.mapped ? (
+                          [...c.skills, ...c.competencies.map((x) => x.name)].map((s) => (
+                            <span key={s}>{s}</span>
+                          ))
+                        ) : (
+                          <span className="sa-unmapped">Skills not mapped yet</span>
+                        )}
                       </div>
                     </div>
-                    <div className="sa-seg" role="group" aria-label={`${c.code} status`}>
+                    <div className="sa-seg" role="group" aria-label={`${c.courseCode} status`}>
                       {(
                         [
                           ["NONE", "Not taken"],
                           ["IN_PROGRESS", "Taking now"],
-                          ["DONE", "Completed"],
+                          ["COMPLETED", "Completed"],
                         ] as [CourseStatus, string][]
                       ).map(([val, label]) => (
                         <button
                           key={val}
                           type="button"
-                          aria-pressed={courses[c.code] === val}
-                          className={courses[c.code] === val ? "active" : ""}
-                          onClick={() => setCourses({ ...courses, [c.code]: val })}
+                          aria-pressed={(courses[c.courseId] ?? "NONE") === val}
+                          className={(courses[c.courseId] ?? "NONE") === val ? "active" : ""}
+                          onClick={() => setCourses({ ...courses, [c.courseId]: val })}
                         >
                           {label}
                         </button>
@@ -294,11 +384,11 @@ const SkillAssessmentPage: React.FC = () => {
                 low ratings add helpful milestones to your roadmap.
               </p>
               <div className="sa-rating-list">
-                {NACE_COMPETENCIES.map((n) => (
+                {competencies.map((n) => (
                   <div key={n.id} className="sa-rating-row">
                     <div className="sa-rating-text">
                       <strong>{n.name}</strong>
-                      <span>{n.blurb}</span>
+                      <span>{competencyBlurb(n.name)}</span>
                     </div>
                     <div className="sa-seg sa-scale" role="radiogroup" aria-label={n.name}>
                       {RATING_LABELS.map((label, i) => (
@@ -450,8 +540,14 @@ const SkillAssessmentPage: React.FC = () => {
                 {step === 3 ? "See results" : "Next"} <i className="bi bi-arrow-right" />
               </button>
             ) : (
-              <button type="button" className="rm-btn rm-btn-primary" onClick={finish}>
-                <i className="bi bi-signpost-split" /> Build my roadmap
+              <button
+                type="button"
+                className="rm-btn rm-btn-primary"
+                onClick={finish}
+                disabled={saving}
+              >
+                <i className="bi bi-signpost-split" />{" "}
+                {saving ? "Building your roadmap…" : "Build my roadmap"}
               </button>
             )}
           </div>

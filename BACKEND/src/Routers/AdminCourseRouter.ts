@@ -6,6 +6,7 @@ import {
   updateAdminCourseDetails,
   resolveOrCreateSkill,
 } from "../Controllers/AdminCourseController.js";
+import { getUnmappedFlags } from "../Controllers/ProgressController.js";
 
 export const adminCoursesRouter = Router();
 
@@ -14,3 +15,4 @@ adminCoursesRouter.get("/courses/:courseId/mapping", getAdminCourseMapping);
 adminCoursesRouter.put("/courses/:courseId/mapping", updateAdminCourseMapping);
 adminCoursesRouter.put("/courses/:courseId", updateAdminCourseDetails);
 adminCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
+adminCoursesRouter.get("/unmapped-flags", getUnmappedFlags);
