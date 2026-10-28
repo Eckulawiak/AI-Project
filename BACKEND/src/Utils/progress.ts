@@ -1,6 +1,12 @@
 // Progress math for the career roadmap (SDS 3.1.2, ProgressService).
 
-export const CATEGORIES = ["COURSE", "SKILL", "CERT", "EXPERIENCE"] as const;
+export const CATEGORIES = [
+  "COURSE",
+  "CAREER_PREP",
+  "SKILL",
+  "CERT",
+  "EXPERIENCE",
+] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 export const CLASS_YEARS = ["FIRST", "SOPH", "JUNIOR", "SENIOR"] as const;
