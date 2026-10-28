@@ -11,7 +11,8 @@
  *                    (minors, certificates and dual degrees are skipped)
  *   courses        ← every course on every undergraduate and graduate
  *                    subject page
- *   major_courses  ← the courses named in each major's requirements table
+ *   major_courses  ← the courses named in each major's requirements table,
+ *                    REQUIRED or RECOMMENDED (electives and pick-one lists)
  *
  * The catalog does not list instructors, so new courses get professor "N/A"
  * (the column default); faculty still claim their courses in the app.
@@ -89,7 +90,10 @@ export type ScrapedMajor = {
   level: Level;
   school: string;
   urls: string[];
-  courseCodes: string[];
+  // Courses every student in the major takes, and the ones they choose
+  // between (electives, pick lists, "or" alternatives).
+  requiredCodes: string[];
+  electiveCodes: string[];
 };
 
 export type ScrapedCourse = {
@@ -324,16 +328,102 @@ export function parseSchoolPrograms(
 }
 
 // ── Course codes in a program's requirements table ──────────────────────────
-export function parseProgramCourseCodes(html: string): string[] {
+// CourseLeaf requirement tables mix courses every student takes with ones
+// they pick from. A course counts as an elective when it sits:
+//   - under an area header that says "elective",
+//   - in a pick list: the rows after a comment such as "Select one of the
+//     following" or "Math electives ... must come from this list" (indented
+//     rows when the table indents, otherwise every row up to the next
+//     comment or header), or
+//   - on either side of an "or" row (Calculus I or MA 151).
+// Everything else is required. A code that is required anywhere on the
+// page stays required.
+export type ProgramCourses = { required: string[]; electives: string[] };
+
+const ELECTIVE_HEADER = /elective/i;
+const PICK_LIST =
+  /(select|choose|pick)\b|one of the|following|from (this|the) list|from among|list below/i;
+
+export function parseProgramCourses(html: string): ProgramCourses {
   const $ = cheerio.load(html);
-  const codes = new Set<string>();
-  $("table.sc_courselist a.code, table.sc_courselist td.codecol a").each(
-    (_i, el) => {
-      const code = normalizeCode(clean($(el).text()));
-      if (/^[A-Z]+-\d+[A-Z]?$/.test(code)) codes.add(code);
-    },
+  // One entry per row that names courses; an "or" row flips the row before.
+  const listed: { codes: string[]; elective: boolean }[] = [];
+
+  $("table.sc_courselist").each((_t, table) => {
+    const rows = $(table).find("tr").toArray();
+    const isIndented = (row: (typeof rows)[number]) =>
+      $(row).find("td.codecol div.blockindent, td.codecol div[style*='margin-left']")
+        .length > 0;
+    const tableIndents = rows.some(isIndented);
+
+    let electiveArea = false;
+    let pickList = false;
+    let previous: { codes: string[]; elective: boolean } | undefined;
+
+    for (const row of rows) {
+      const $row = $(row);
+      // "CSC 110 & 110L": a bare number takes the subject before it.
+      let subject = "";
+      const codes = $row
+        .find("a.code, td.codecol a")
+        .toArray()
+        .map((a) => {
+          const code = normalizeCode(clean($(a).text()));
+          if (/^\d+[A-Z]?$/.test(code) && subject) return `${subject}-${code}`;
+          subject = code.split("-")[0] ?? "";
+          return code;
+        })
+        .filter((code) => /^[A-Z]+-\d+[A-Z]?$/.test(code));
+      const text = clean($row.text());
+
+      if ($row.hasClass("listsum") || /^total credits/i.test(text)) {
+        pickList = false;
+        previous = undefined;
+        continue;
+      }
+      if ($row.hasClass("areaheader") || $row.find(".areaheader").length) {
+        electiveArea = ELECTIVE_HEADER.test(text);
+        pickList = false;
+        previous = undefined;
+        continue;
+      }
+
+      const isComment =
+        $row.find("td.codecol").length === 0 &&
+        $row.find(".courselistcomment").length > 0;
+      if (isComment) {
+        pickList = PICK_LIST.test(text);
+        // A comment can name a single course, e.g. "Discrete Math (CSC 205)".
+        if (codes.length)
+          listed.push({ codes, elective: electiveArea || pickList });
+        previous = undefined;
+        continue;
+      }
+      if (codes.length === 0) continue;
+
+      // "or MA 151": this row and the one before it are alternatives.
+      if ($row.hasClass("orclass") || /^or\b/i.test(text)) {
+        if (previous) previous.elective = true;
+        listed.push({ codes, elective: true });
+        continue;
+      }
+
+      if (pickList && tableIndents && !isIndented(row)) pickList = false;
+      previous = { codes, elective: electiveArea || pickList };
+      listed.push(previous);
+    }
+  });
+
+  const required = new Set(
+    listed.filter((r) => !r.elective).flatMap((r) => r.codes),
   );
-  return [...codes];
+  const electives = new Set(
+    listed
+      .filter((r) => r.elective)
+      .flatMap((r) => r.codes)
+      .filter((code) => !required.has(code)),
+  );
+  return { required: [...required], electives: [...electives] };
 }
 
 // ── Course subject → major ──────────────────────────────────────────────────
@@ -393,7 +483,9 @@ async function scrapeMajors(): Promise<ScrapedMajor[]> {
 
     for (const program of programs) {
       const programHtml = await fetchPage(program.path);
-      const codes = programHtml ? parseProgramCourseCodes(programHtml) : [];
+      const codes = programHtml
+        ? parseProgramCourses(programHtml)
+        : { required: [], electives: [] };
 
       const existing = majors.get(program.name);
       if (existing && existing.school !== school) {
@@ -407,10 +499,16 @@ async function scrapeMajors(): Promise<ScrapedMajor[]> {
         level,
         school,
         urls: [],
-        courseCodes: [],
+        requiredCodes: [],
+        electiveCodes: [],
       };
       major.urls.push(program.path);
-      major.courseCodes = [...new Set([...major.courseCodes, ...codes])];
+      // BA and BS of one field share a major: a course either one requires
+      // is required.
+      major.requiredCodes = [...new Set([...major.requiredCodes, ...codes.required])];
+      major.electiveCodes = [
+        ...new Set([...major.electiveCodes, ...codes.electives]),
+      ].filter((code) => !major.requiredCodes.includes(code));
       majors.set(program.name, major);
     }
   }
@@ -584,26 +682,34 @@ async function writeToSupabase(
     courseIds.set(c.course_code, [...(courseIds.get(c.course_code) ?? []), c.course_id]);
   }
 
+  // Electives stay linked (faculty still map them for the major) but as
+  // RECOMMENDED, so the roadmap and assessment use only REQUIRED rows.
   const links: { major_id: number; course_id: number; requirement_type: string }[] = [];
   for (const m of majors) {
     const mId = majorId.get(m.name);
     if (mId === undefined) continue;
-    for (const code of m.courseCodes) {
+    const typed = [
+      ...m.requiredCodes.map((code) => [code, "REQUIRED"] as const),
+      ...m.electiveCodes.map((code) => [code, "RECOMMENDED"] as const),
+    ];
+    for (const [code, requirement_type] of typed) {
       for (const cId of courseIds.get(code) ?? []) {
-        links.push({ major_id: mId, course_id: cId, requirement_type: "REQUIRED" });
+        links.push({ major_id: mId, course_id: cId, requirement_type });
       }
     }
   }
+  // Not ignoreDuplicates: rows from earlier scrapes (all REQUIRED) get
+  // their type corrected.
   for (let i = 0; i < links.length; i += CHUNK) {
     const { error } = await supabase
       .from("major_courses")
-      .upsert(links.slice(i, i + CHUNK), {
-        onConflict: "major_id,course_id",
-        ignoreDuplicates: true,
-      });
+      .upsert(links.slice(i, i + CHUNK), { onConflict: "major_id,course_id" });
     if (error) throw new Error(`major_courses: ${error.message}`);
   }
-  console.log(`✓ Major courses: ${links.length} links`);
+  const requiredCount = links.filter((l) => l.requirement_type === "REQUIRED").length;
+  console.log(
+    `✓ Major courses: ${links.length} links (${requiredCount} required, ${links.length - requiredCount} electives)`,
+  );
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
