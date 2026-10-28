@@ -1,0 +1,466 @@
+/* Shared styles for the faculty Student Progress and admin Reports pages. */
+
+.report-page {
+  width: 100%;
+  min-height: 100vh;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.report-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 1rem auto 2rem;
+  padding: 0 1rem;
+  color: #131d43;
+  text-align: left;
+}
+
+.report-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.report-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.report-sub {
+  margin: 0.25rem 0 0;
+  color: #6b7280;
+  max-width: 46rem;
+}
+
+.report-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.report-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.report-card-title .bi {
+  color: #b7791f;
+}
+
+.report-card-note {
+  color: #6b7280;
+  font-size: 0.88rem;
+  margin: -0.5rem 0 0.9rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.report-group {
+  border: 1px solid #e3e6ef;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.report-group-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.report-group-meta {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin: 0.1rem 0 0.75rem;
+}
+
+.report-banner {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  background: #eef2fb;
+  border: 1px solid #c9d4ef;
+}
+
+.report-banner.error {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
+.report-muted {
+  color: #6b7280;
+}
+
+/* KPIs */
+.ps2-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.ps2-kpi {
+  display: flex;
+  flex-direction: column;
+}
+
+.ps2-kpi-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps2-stats.compact .ps2-kpis {
+  gap: 1.25rem;
+}
+
+.ps2-stats.compact .ps2-kpi-value {
+  font-size: 1.5rem;
+}
+
+.ps2-kpi-label {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.ps2-reached {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.ps2-chip {
+  background: #f1f3f9;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.ps2-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.5rem 2rem;
+}
+
+.ps2-sub {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin: 0.25rem 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ps2-bar-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) 1fr 3.2rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.ps2-stats.compact .ps2-bar-row {
+  grid-template-columns: minmax(6rem, 9.5rem) 1fr 3rem;
+  font-size: 0.85rem;
+}
+
+.ps2-bar-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ps2-bar {
+  height: 8px;
+  background: #e8ebf3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ps2-bar > span {
+  display: block;
+  height: 100%;
+  background: #131d43;
+  border-radius: 999px;
+}
+
+.ps2-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #374151;
+}
+
+.ps2-suppressed {
+  margin: 0.25rem 0 0;
+  color: #4b5563;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.ps2-suppressed .bi {
+  color: #6b7280;
+  margin-top: 0.1rem;
+}
+
+/* Trends */
+.ps2-trends {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.ps2-trend-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ps2-trend-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid #eef0f5;
+}
+
+.ps2-trend-list li:first-child {
+  border-top: none;
+}
+
+.ps2-trend-name {
+  font-weight: 600;
+}
+
+.ps2-trend-meta {
+  grid-row: 2;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.ps2-trend-pct {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.ps2-trend-list.good .ps2-trend-pct {
+  background: #e7f6ee;
+  color: #1f7a52;
+}
+
+.ps2-trend-list.gap .ps2-trend-pct {
+  background: #fff1cc;
+  color: #7a5800;
+}
+
+/* Admin usage tiles */
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+.usage-tile {
+  border: 1px solid #e3e6ef;
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+}
+
+.usage-tile-value {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-tile-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.usage-tile-detail {
+  display: block;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.period-picker {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.period-picker button {
+  background: #fff !important;
+  border: 1px solid #cfd4e2 !important;
+  color: #131d43;
+  border-radius: 999px !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.88rem !important;
+}
+
+.period-picker button.active {
+  background: #131d43 !important;
+  border-color: #131d43 !important;
+  color: #ffb718;
+}
+
+/* Login chart */
+.login-chart {
+  margin-top: 1rem;
+}
+
+.login-chart svg {
+  width: 100%;
+  height: 120px;
+  display: block;
+}
+
+.login-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+/* School table */
+.school-table {
+  border: 1px solid #e3e6ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.school-row {
+  display: grid;
+  grid-template-columns: 2.2fr 0.9fr 0.9fr 0.9fr 2.4fr;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-top: 1px solid #eef0f5;
+  align-items: center;
+  font-size: 0.92rem;
+}
+
+.school-row:first-child {
+  border-top: none;
+}
+
+.school-row.head {
+  background: #f5f6fa;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+}
+
+.school-name {
+  font-weight: 600;
+}
+
+.school-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.school-hidden {
+  grid-column: 2 / 6;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 767.98px) {
+  .report-main {
+    padding: 0 1rem;
+  }
+
+  .report-title {
+    font-size: 1.6rem;
+  }
+
+  .report-card {
+    padding: 1rem;
+  }
+
+  .ps2-trends {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .usage-tile {
+    padding: 0.7rem 0.8rem;
+  }
+
+  .usage-tile-value {
+    font-size: 1.4rem;
+  }
+
+  .school-row.head {
+    display: none;
+  }
+
+  .school-row {
+    grid-template-columns: 1fr 1fr 1fr;
+    row-gap: 0.3rem;
+  }
+
+  .school-name {
+    grid-column: 1 / -1;
+  }
+
+  .school-num {
+    text-align: left;
+  }
+
+  .school-num::before {
+    display: block;
+    font-size: 0.72rem;
+    color: #6b7280;
+    content: attr(data-label);
+  }
+
+  .school-row > .ps2-bar {
+    grid-column: 1 / -1;
+  }
+
+  .school-hidden {
+    grid-column: 1 / -1;
+  }
+}

@@ -13,6 +13,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import HistoryPage from "./HistoryPage";
 import AuditLogsPage from "./AuditLogsPage";
+import FacultyProgressPage from "./FacultyProgressPage";
+import AdminReportsPage from "./AdminReportsPage";
 import SkillAssessmentPage from "./SkillAssessmentPage";
 import RoadmapPage from "./RoadmapPage";
 import { CareerProgressProvider } from "./context/CareerProgressContext";
@@ -86,6 +88,23 @@ createRoot(document.getElementById("root")!).render(
           element={
             <ProtectedRoute allowedTypes={["Administrator"]}>
               <UnmappedCourses />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/faculty-progress"
+          element={
+            <ProtectedRoute allowedTypes={["Faculty/Administrator", "Administrator"]}>
+              <FacultyProgressPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-reports"
+          element={
+            <ProtectedRoute allowedTypes={["Administrator"]}>
+              <AdminReportsPage />
             </ProtectedRoute>
           }
         />

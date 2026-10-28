@@ -1,5 +1,10 @@
 import { type Request, type Response } from "express";
-import { supabase } from "../Database/supabaseClient.js";
+import {
+  MIN_GROUP_SIZE,
+  getAllSchoolsProgress,
+  getFacultyProgressReport,
+} from "../Models/ProgressReportModel.js";
+import { REPORT_PERIODS, getUsageReport } from "../Models/UsageReportModel.js";
 import { getOpenFlags } from "../Models/UnmappedFlagsModel.js";
 import { getOpenTemplateGaps } from "../Models/TemplateGapsModel.js";
 
@@ -7,32 +12,30 @@ const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : "Unknown error";
 
 // GET /api/faculty/progress
-// De-identified progress per school and category, read from the
-// school_progress_aggregate view, which hides groups under five students
-// (REQ-SEC-6).
-export const getAggregateProgress = async (_req: Request, res: Response) => {
+// De-identified progress for the majors this faculty member covers and their
+// schools (REQ-PROG-7, REQ-ROAD-8). Groups under five students are hidden.
+export const getAggregateProgress = async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from("school_progress_aggregate")
-      .select("school_id, category, student_count, avg_pct, median_pct");
-    if (error) throw new Error(error.message);
+    const facultyId = Number(req.user?.userId);
+    if (!Number.isInteger(facultyId) || facultyId <= 0) {
+      return res.status(400).json({ error: "Missing or invalid faculty session" });
+    }
+    res.json(await getFacultyProgressReport(facultyId));
+  } catch (e: unknown) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+};
 
-    const { data: schools, error: schoolError } = await supabase
-      .from("schools")
-      .select("id, name");
-    if (schoolError) throw new Error(schoolError.message);
-    const names = new Map((schools ?? []).map((s: any) => [s.id, s.name]));
-
-    res.json(
-      (data ?? []).map((r: any) => ({
-        schoolId: r.school_id,
-        school: names.get(r.school_id) ?? null,
-        category: r.category,
-        studentCount: Number(r.student_count),
-        avgPct: Number(r.avg_pct),
-        medianPct: Number(r.median_pct),
-      })),
-    );
+// GET /api/admin/reports?days=30 -> usage and progress across schools (REQ-PROG-8)
+export const getAdminReport = async (req: Request, res: Response) => {
+  try {
+    const requested = Number(req.query.days ?? 30);
+    const days = (REPORT_PERIODS as readonly number[]).includes(requested) ? requested : 30;
+    const [usage, progress] = await Promise.all([
+      getUsageReport(days),
+      getAllSchoolsProgress(),
+    ]);
+    res.json({ minGroupSize: MIN_GROUP_SIZE, usage, progress });
   } catch (e: unknown) {
     res.status(500).json({ error: errorMessage(e) });
   }

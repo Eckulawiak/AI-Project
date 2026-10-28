@@ -7,6 +7,7 @@ import {
   resolveOrCreateSkill,
 } from "../Controllers/AdminCourseController.js";
 import {
+  getAdminReport,
   getTemplateGaps,
   getUnmappedFlags,
 } from "../Controllers/ProgressController.js";
@@ -20,3 +21,4 @@ adminCoursesRouter.put("/courses/:courseId", updateAdminCourseDetails);
 adminCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
 adminCoursesRouter.get("/unmapped-flags", getUnmappedFlags);
 adminCoursesRouter.get("/template-gaps", getTemplateGaps);
+adminCoursesRouter.get("/reports", getAdminReport);

@@ -46,6 +46,8 @@ const Navbar: React.FC = () => {
         navigate("/studentdashboard");
       } else if (userType === "Administrator" || userType === "Admin") {
         navigate("/adminDashboard");
+      } else if (userType === "Faculty/Administrator") {
+        navigate("/facultyAdmin");
       } else {
         navigate("/"); // Fallback
       }
@@ -103,6 +105,32 @@ const Navbar: React.FC = () => {
                   </button>
                 </li>
               ))}
+
+            {/* Faculty: de-identified student progress (REQ-PROG-7, REQ-ROAD-8) */}
+            {userType === "Faculty/Administrator" && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/faculty-progress")}
+                >
+                  {location.pathname === "/faculty-progress"
+                    ? "Dashboard"
+                    : "Student Progress"}
+                </button>
+              </li>
+            )}
+
+            {/* Admin: usage and progress reports (REQ-PROG-8) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-reports")}
+                >
+                  {location.pathname === "/admin-reports" ? "Dashboard" : "Reports"}
+                </button>
+              </li>
+            )}
 
             {/* Admin Navigation Toggle (checking both Admin and Administrator for DB safety) */}
             {(userType === "Administrator" || userType === "Admin") && (

@@ -1,3 +1,4 @@
+import { RequireFaculty } from "../Middleware/RequireFaculty.js";
 import { Router } from "express";
 import {
   getCourses,
@@ -19,7 +20,7 @@ facultyCoursesRouter.get("/courses", getCourses);
 facultyCoursesRouter.get("/unassigned-courses", fetchUnassignedCourses);
 facultyCoursesRouter.get("/skills-options", getSkillsOptions);
 facultyCoursesRouter.get("/courses/:courseId/mapping", getCourseMapping);
-facultyCoursesRouter.get("/progress", getAggregateProgress);
+facultyCoursesRouter.get("/progress", RequireFaculty, getAggregateProgress);
 
 // --- Validation Routes (Must go before generic /:courseId routes) ---
 facultyCoursesRouter.get("/courses/check-code", checkCourseCode);
