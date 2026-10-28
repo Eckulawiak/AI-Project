@@ -10,6 +10,7 @@ import {
   createNewCourse,
   resolveOrCreateSkill,
 } from "../Controllers/FacultyCourseController.js";
+import { getAggregateProgress } from "../Controllers/ProgressController.js";
 
 export const facultyCoursesRouter = Router();
 
@@ -18,6 +19,7 @@ facultyCoursesRouter.get("/courses", getCourses);
 facultyCoursesRouter.get("/unassigned-courses", fetchUnassignedCourses);
 facultyCoursesRouter.get("/skills-options", getSkillsOptions);
 facultyCoursesRouter.get("/courses/:courseId/mapping", getCourseMapping);
+facultyCoursesRouter.get("/progress", getAggregateProgress);
 
 // --- Validation Routes (Must go before generic /:courseId routes) ---
 facultyCoursesRouter.get("/courses/check-code", checkCourseCode);

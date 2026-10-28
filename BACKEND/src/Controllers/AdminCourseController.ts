@@ -12,6 +12,7 @@ import {
   getCourseMappings,
   replaceMappingsForCourseIds,
 } from "../Models/CourseSkillMappingModel.js";
+import { resolveFlagsForMappedCourses } from "../Models/UnmappedFlagsModel.js";
 import {
   getAllSkillsAndCompetencies,
   findOrCreateSkillByName,
@@ -96,6 +97,7 @@ export const updateAdminCourseMapping = async (
     ];
 
     await replaceMappingsForCourseIds(allCourseIdsToReplace, uniqueIds);
+    await resolveFlagsForMappedCourses(allCourseIdsToReplace);
     const updated = await getCourseMappings(courseId);
 
     res.json({

@@ -3,18 +3,16 @@
 import { createContext, useContext } from "react";
 import {
   CATEGORIES,
-  type AssessmentResult,
-  type Category,
+  type AssessmentSubmission,
   type Milestone,
+  type Progress,
+  type RoadmapResponse,
   type StudentProfile,
-} from "../mock/careerData";
+} from "../career/careerData";
 
 export const THRESHOLDS = [25, 50, 75, 100];
 
-export interface Progress {
-  overall: number;
-  byCategory: Record<Category, { done: number; total: number; pct: number }>;
-}
+export type { Progress };
 
 export interface CelebrationEvent {
   kind: "milestone" | "threshold";
@@ -24,18 +22,24 @@ export interface CelebrationEvent {
 }
 
 export interface CareerProgressValue {
-  profile: StudentProfile;
+  loading: boolean;
+  error: string;
+  profile: StudentProfile | null;
+  roadmap: RoadmapResponse["roadmap"] | null;
+  lastAssessmentAt: string | null;
   milestones: Milestone[];
-  assessment: AssessmentResult | null;
   progress: Progress;
   nextMilestones: Milestone[];
-  toggleMilestone: (id: string) => void;
-  applyAssessment: (result: AssessmentResult) => void;
-  resetDemo: () => void;
+  toggleMilestone: (id: number) => void;
+  submitAssessment: (body: AssessmentSubmission) => Promise<void>;
+  regenerate: () => Promise<void>;
+  refresh: () => Promise<void>;
   celebration: CelebrationEvent | null;
   dismissCelebration: () => void;
 }
 
+// Same formula as the server (SDS 3.1.2, ProgressService), so the bar can
+// move as soon as a box is ticked.
 export function computeProgress(milestones: Milestone[]): Progress {
   const byCategory = {} as Progress["byCategory"];
   const pcts: number[] = [];
@@ -46,11 +50,15 @@ export function computeProgress(milestones: Milestone[]): Progress {
     byCategory[c.id] = { done, total: items.length, pct };
     if (items.length) pcts.push((done / items.length) * 100);
   }
-  // Each category counts equally (SDS 3.1.1, ProgressService).
+  // Each category counts equally.
   const overall = pcts.length
     ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
     : 0;
   return { overall, byCategory };
+}
+
+export function crossedThreshold(before: number, after: number): number | null {
+  return [...THRESHOLDS].reverse().find((t) => before < t && after >= t) ?? null;
 }
 
 export const CareerProgressContext = createContext<CareerProgressValue | null>(null);

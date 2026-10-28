@@ -77,6 +77,12 @@
   margin-bottom: 1rem;
 }
 
+.roadmap-banner-error {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
 .roadmap-banner a {
   color: #131d43;
   text-decoration: underline;
