@@ -571,6 +571,26 @@ async function clearTables(supabase: SupabaseClient) {
 }
 
 // ── Write to Supabase ───────────────────────────────────────────────────────
+// Retry Supabase requests that die on the network ("fetch failed").
+// A plain insert is not retried: it may have landed before the connection
+// dropped, and courses have no unique key to stop a duplicate. Updates and
+// upserts are safe to repeat.
+const retryingFetch: typeof globalThis.fetch = async (input, init) => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const prefer = new Headers(init?.headers).get("Prefer") ?? "";
+  const attempts = method === "POST" && !prefer.includes("resolution=") ? 1 : 4;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await globalThis.fetch(input, init);
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`  ! Supabase: ${reason} (attempt ${attempt}/${attempts})`);
+      await sleep(1000 * 2 ** attempt);
+    }
+  }
+};
+
 async function writeToSupabase(
   majors: ScrapedMajor[],
   courses: ScrapedCourse[],
@@ -579,6 +599,7 @@ async function writeToSupabase(
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_API_KEY!,
+    { global: { fetch: retryingFetch } },
   );
   const CHUNK = 200;
 
@@ -629,11 +650,16 @@ async function writeToSupabase(
 
   // Courses: course_code has no unique constraint, so match existing rows
   // by code and update them; insert the rest.
-  const existing = await selectAll<{ course_id: number; course_code: string }>(
-    "courses",
-    "course_id, course_code",
-  );
-  const existingCodes = new Set(existing.map((c) => c.course_code));
+  const existing = await selectAll<{
+    course_id: number;
+    course_code: string;
+    course_name: string;
+    major_id: number | null;
+  }>("courses", "course_id, course_code, course_name, major_id");
+  const existingByCode = new Map<string, typeof existing>();
+  for (const e of existing)
+    existingByCode.set(e.course_code, [...(existingByCode.get(e.course_code) ?? []), e]);
+  const existingCodes = new Set(existingByCode.keys());
 
   const subjectMajor = new Map<string, number | null>();
   const majorFor = (c: ScrapedCourse) => {
@@ -660,15 +686,31 @@ async function writeToSupabase(
     if (error) throw new Error(`courses insert: ${error.message}`);
   }
 
-  let updated = 0;
-  for (const c of courses.filter((c) => existingCodes.has(c.course_code))) {
+  // Update only the courses whose name or major changed, a few at a time.
+  const changed = courses.filter((c) => {
+    if (!existingCodes.has(c.course_code)) return false;
     const { course_name, major_id } = toRow(c);
-    const { error } = await supabase
-      .from("courses")
-      .update({ course_name, major_id })
-      .eq("course_code", c.course_code);
-    if (error) console.error(`  ✗ ${c.course_code}: ${error.message}`);
-    else updated++;
+    return existingByCode
+      .get(c.course_code)!
+      .some((e) => e.course_name !== course_name || e.major_id !== major_id);
+  });
+  console.log(`Updating ${changed.length} changed courses...`);
+  let updated = 0;
+  const PARALLEL = 8;
+  for (let i = 0; i < changed.length; i += PARALLEL) {
+    await Promise.all(
+      changed.slice(i, i + PARALLEL).map(async (c) => {
+        const { course_name, major_id } = toRow(c);
+        const { error } = await supabase
+          .from("courses")
+          .update({ course_name, major_id })
+          .eq("course_code", c.course_code);
+        if (error) console.error(`  ✗ ${c.course_code}: ${error.message}`);
+        else updated++;
+      }),
+    );
+    if ((i + PARALLEL) % 400 === 0)
+      console.log(`  … ${Math.min(i + PARALLEL, changed.length)}/${changed.length}`);
   }
   console.log(`✓ Courses: ${newCourses.length} inserted, ${updated} updated`);
 
