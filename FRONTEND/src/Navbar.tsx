@@ -13,6 +13,7 @@ const STRIP_PATHS = ["/studentdashboard", "/history"];
 const STUDENT_LINKS = [
   { path: "/skill-assessment", label: "Skill Assessment" },
   { path: "/roadmap", label: "Roadmap" },
+  { path: "/skill-reviews", label: "Advisor Feedback" },
   { path: "/history", label: "History" },
 ];
 
@@ -116,6 +117,22 @@ const Navbar: React.FC = () => {
                   {location.pathname === "/faculty-progress"
                     ? "Dashboard"
                     : "Student Progress"}
+                </button>
+              </li>
+            )}
+
+            {/* Faculty/advisors: rate the students who invited them */}
+            {(userType === "Faculty/Administrator" ||
+              userType === "Administrator" ||
+              userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/faculty-reviews")}
+                >
+                  {location.pathname === "/faculty-reviews"
+                    ? "Dashboard"
+                    : "Student Reviews"}
                 </button>
               </li>
             )}

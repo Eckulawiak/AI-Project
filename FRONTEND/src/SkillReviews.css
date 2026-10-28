@@ -1,0 +1,111 @@
+/* Faculty/advisor skill reviews (SkillReviewsPage, FacultyReviewsPage) */
+
+.sr-matches {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sr-matches li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #eef0f5;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+
+.sr-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.sr-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+.sr-status.pending {
+  background: #fff1cc;
+  color: #7a5800;
+}
+
+.sr-status.done {
+  background: #e3f4e8;
+  color: #1d6b38;
+}
+
+.sr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sr-table th,
+.sr-table td {
+  text-align: left;
+  padding: 0.5rem 0.4rem;
+  border-bottom: 1px solid #eef0f5;
+  vertical-align: top;
+}
+
+.sr-table thead th {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.sr-blurb {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.sr-diff {
+  font-weight: 700;
+  color: #131d43;
+}
+
+.sr-comment {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  background: #f6f7fb;
+  border-left: 3px solid #ffb718;
+  border-radius: 6px;
+}
+
+.sr-comment-field {
+  margin-top: 1rem;
+}
+
+.sr-comment-field textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cfd4e2;
+  border-radius: 10px;
+}
+
+.sr-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 600px) {
+  .sr-matches li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
