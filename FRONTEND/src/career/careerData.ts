@@ -57,6 +57,8 @@ export interface Milestone {
   courseId: number | null;
   courseCode: string | null;
   competencies: Competency[];
+  component: string | null; // framework heading, e.g. "Networking"
+  resources: string[]; // ways to work on it: courses, offices, events
   completedAt: string | null;
 }
 
