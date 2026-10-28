@@ -208,7 +208,7 @@ const RoadmapPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Four category tracks (REQ-ROAD-2, REQ-ROAD-5) */}
+        {/* Category tracks (REQ-ROAD-2, REQ-ROAD-5) */}
         <section className="rm-tracks">
           {CATEGORIES.map((c) => {
             const items = visible(c.id);

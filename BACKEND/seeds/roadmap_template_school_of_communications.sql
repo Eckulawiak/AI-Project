@@ -2,7 +2,8 @@
 -- Roadmap template: School of Communications
 -- Source: "Career Mapping Framework - SOC" (Career Development Framework)
 --
--- Run after migrations/roadmap_template_details.sql. Safe to re-run: rows
+-- Run after migrations/roadmap_template_details.sql and
+-- migrations/career_prep_category.sql. Safe to re-run: rows
 -- are matched on (class year, component) and updated in place, so editing
 -- the framework below and running this again keeps students' links.
 --
@@ -12,7 +13,9 @@
 --                     Fourth-Year/Grad Students -> SENIOR)
 --   Component      -> one milestone; _components below gives its roadmap
 --                     category, the name students see, and the NACE
---                     competencies it builds
+--                     competencies it builds. A component that repeats
+--                     across years gets a title per year in _year_names,
+--                     so each year reads as the next step.
 --   Details        -> resources ("Ways to do this"), one entry per item
 --
 -- To add another school, copy this file, change the school name and
@@ -52,13 +55,13 @@ insert into _components values
   ('Pre-Enrollment', 'EXPERIENCE', 'Attend SOC orientation or a summer camp',
    'Get to know the School of Communications before your first semester.',
    array['Career and Self-Development']),
-  ('Reflection and Exploration', 'SKILL', 'Reflect on and explore career paths',
+  ('Reflection and Exploration', 'CAREER_PREP', 'Reflect on and explore career paths',
    'Learn what you enjoy and which careers fit, using career tools, events and appointments.',
    array['Career and Self-Development', 'Critical Thinking']),
   ('Career Course', 'COURSE', 'Take the career course (COM 201)',
    'COM 201 covers career planning, AI tools for the job search, and professional headshots.',
    array['Career and Self-Development', 'Professionalism', 'Technology']),
-  ('Resume', 'SKILL', 'Build and update your resume',
+  ('Resume', 'CAREER_PREP', 'Build and update your resume',
    'Draft your resume and keep it current with help from Career Development.',
    array['Communication', 'Career and Self-Development']),
   ('Networking', 'EXPERIENCE', 'Grow your professional network',
@@ -73,7 +76,7 @@ insert into _components values
   ('Internships/Experiential Learning', 'EXPERIENCE', 'Complete an internship or hands-on experience',
    'Take on an internship or another hands-on role in your field.',
    array['Professionalism', 'Teamwork', 'Technology']),
-  ('Graduate School', 'SKILL', 'Explore graduate school options',
+  ('Graduate School', 'CAREER_PREP', 'Explore graduate school options',
    'Talk with Career Development about whether and when graduate school fits your goals.',
    array['Career and Self-Development']),
   ('Engage Outside World', 'EXPERIENCE', 'Engage with your industry beyond campus',
@@ -82,7 +85,7 @@ insert into _components values
   ('Mentorship', 'EXPERIENCE', 'Connect with a mentor',
    'Find an alum or professional who can guide your career.',
    array['Career and Self-Development', 'Professionalism']),
-  ('Job Search', 'SKILL', 'Run your job search',
+  ('Job Search', 'CAREER_PREP', 'Run your job search',
    'Search and apply for full-time or freelance work after graduation.',
    array['Career and Self-Development', 'Professionalism']);
 
@@ -159,6 +162,42 @@ insert into _framework values
    array['LinkedIn', 'Class visits', 'Alumni events', 'Off-campus conferences/trips', 'MSS alumni panel', 'Cannes Film Festival', 'Sundance Film Festival']);
 
 
+-- Titles for components that repeat across years; others use the
+-- _components name.
+drop table if exists _year_names;
+create temp table _year_names (
+  class_year  text not null,
+  component   text not null,
+  name        text not null,
+  primary key (class_year, component)
+);
+
+insert into _year_names values
+  ('FIRST',  'Reflection and Exploration', 'Explore careers in communications'),
+  ('SOPH',   'Reflection and Exploration', 'Narrow down your career interests'),
+  ('JUNIOR', 'Reflection and Exploration', 'Test your career direction'),
+  ('SENIOR', 'Reflection and Exploration', 'Confirm your plan after graduation'),
+  ('FIRST',  'Resume', 'Draft your first resume'),
+  ('SOPH',   'Resume', 'Add your new experience to your resume'),
+  ('JUNIOR', 'Resume', 'Tailor your resume for internships'),
+  ('SENIOR', 'Resume', 'Finalize your resume for the job search'),
+  ('FIRST',  'Networking', 'Start your professional network'),
+  ('SOPH',   'Networking', 'Grow your network through class visits and events'),
+  ('JUNIOR', 'Networking', 'Network at career fairs and alumni panels'),
+  ('SENIOR', 'Networking', 'Use your network in your job search'),
+  ('SOPH',   'Graduate School', 'Learn about graduate school options'),
+  ('JUNIOR', 'Graduate School', 'Decide whether graduate school fits your plan'),
+  ('SENIOR', 'Graduate School', 'Apply to graduate programs if they are your plan'),
+  ('FIRST',  'Engagement and Involvement', 'Join a student organization'),
+  ('SENIOR', 'Engagement and Involvement', 'Take a leadership role on campus'),
+  ('FIRST',  'Experiential Learning', 'Get a campus job or student role'),
+  ('SOPH',   'Experiential Learning', 'Take on a bigger hands-on role'),
+  ('JUNIOR', 'Engage Outside World', 'Engage with your industry beyond campus'),
+  ('SENIOR', 'Engage Outside World', 'Deepen your industry connections off campus'),
+  ('JUNIOR', 'Mentorship', 'Connect with a mentor'),
+  ('SENIOR', 'Mentorship', 'Keep learning from your mentor');
+
+
 -- ---------------------------------------------------------------------
 -- [4] Checks
 -- ---------------------------------------------------------------------
@@ -175,6 +214,13 @@ begin
   where c.component is null;
   if missing is not null then
     raise exception 'Add these components to _components: %', missing;
+  end if;
+
+  select string_agg(y.class_year || ' ' || y.component, ', ') into missing
+  from _year_names y left join _framework f using (class_year, component)
+  where f.component is null;
+  if missing is not null then
+    raise exception 'These _year_names rows match no framework row: %', missing;
   end if;
 end $$;
 
@@ -199,10 +245,12 @@ com201 as (
   limit 1
 ),
 source as (
-  select f.*, c.category, c.name, c.description,
+  select f.*, c.category, coalesce(y.name, c.name) as name, c.description,
          case when f.component = 'Career Course'
               then (select course_id from com201) end as course_id
-  from _framework f join _components c using (component)
+  from _framework f
+  join _components c using (component)
+  left join _year_names y using (class_year, component)
 ),
 updated as (
   update template_milestones tm
@@ -264,5 +312,17 @@ where s.name = 'School of Communications'
   and t.major_id is null and t.goal_type = 'ANY'
 on conflict do nothing;
 
+-- ---------------------------------------------------------------------
+-- [7] Students' milestones follow the template's category
+-- Names stay as copied, so a student's roadmap does not change under them;
+-- pending milestones pick up new names when the roadmap is regenerated.
+-- ---------------------------------------------------------------------
+update student_milestones sm
+set category = tm.category
+from template_milestones tm
+where sm.template_milestone_id = tm.id
+  and sm.category <> tm.category;
+
 drop table _framework;
 drop table _components;
+drop table _year_names;
