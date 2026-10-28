@@ -120,18 +120,6 @@ const Navbar: React.FC = () => {
               </li>
             )}
 
-            {/* Admin: usage and progress reports (REQ-PROG-8) */}
-            {(userType === "Administrator" || userType === "Admin") && (
-              <li className="nav-item">
-                <button
-                  className="nav-btn"
-                  onClick={() => handleToggleSubPage("/admin-reports")}
-                >
-                  {location.pathname === "/admin-reports" ? "Dashboard" : "Reports"}
-                </button>
-              </li>
-            )}
-
             {/* Admin: roadmap template milestones (add, edit, delete) */}
             {(userType === "Administrator" || userType === "Admin") && (
               <li className="nav-item">
@@ -142,6 +130,18 @@ const Navbar: React.FC = () => {
                   {location.pathname === "/admin-milestones"
                     ? "Dashboard"
                     : "Milestones"}
+                </button>
+              </li>
+            )}
+
+            {/* Admin: usage and progress reports (REQ-PROG-8) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-reports")}
+                >
+                  {location.pathname === "/admin-reports" ? "Dashboard" : "Reports"}
                 </button>
               </li>
             )}
