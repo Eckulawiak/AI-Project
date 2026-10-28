@@ -8,6 +8,41 @@ export type ClassYear = (typeof CLASS_YEARS)[number];
 
 export const THRESHOLDS = [25, 50, 75, 100];
 
+// TEMPORARY: which milestones are optional, hard-coded until the
+// required column from migrations/required_optional_milestones.sql is
+// added to the database. Then read template_milestones.required instead.
+const OPTIONAL_NAMES = new Set([
+  // university default templates
+  "Build a portfolio of your work",
+  "Give a presentation on a project",
+  "Lead a team project",
+  "Finish an online course in your field",
+  "Earn an industry certification",
+  "Join a student club",
+]);
+const OPTIONAL_COMPONENTS = new Set([
+  // School of Communications framework
+  "Pre-Enrollment",
+  "Engagement and Involvement",
+  "Experiential Learning",
+  "Graduate School",
+  "Engage Outside World",
+  "Mentorship",
+]);
+
+// Assessment suggestions (GAP) and experience the student added are
+// always optional.
+export function isRequiredMilestone(m: {
+  source?: string | null;
+  name?: string | null;
+  component?: string | null;
+}) {
+  if (m.source === "GAP" || m.source === "EXPERIENCE") return false;
+  if (m.name && OPTIONAL_NAMES.has(m.name)) return false;
+  if (m.component && OPTIONAL_COMPONENTS.has(m.component)) return false;
+  return true;
+}
+
 export type Progress = {
   overall: number;
   byCategory: Record<Category, { done: number; total: number; pct: number }>;
@@ -19,12 +54,21 @@ export type Progress = {
 // are left out. Only required milestones count; optional ones are tallied
 // separately so they never hold a student back.
 export function computeProgress(
-  milestones: Array<{ category: string; status: string; required?: boolean | null }>,
+  milestones: Array<{
+    category: string;
+    status: string;
+    required?: boolean | null;
+    source?: string | null;
+    name?: string | null;
+    component?: string | null;
+  }>,
 ): Progress {
   const byCategory = {} as Progress["byCategory"];
   const pcts: number[] = [];
-  const required = milestones.filter((m) => m.required !== false);
-  const optional = milestones.filter((m) => m.required === false);
+  const isRequired = (m: (typeof milestones)[number]) =>
+    m.required ?? isRequiredMilestone(m);
+  const required = milestones.filter(isRequired);
+  const optional = milestones.filter((m) => !isRequired(m));
 
   for (const c of CATEGORIES) {
     const items = required.filter((m) => m.category === c);

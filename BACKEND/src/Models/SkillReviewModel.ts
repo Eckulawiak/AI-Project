@@ -1,7 +1,14 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { getCompetencies } from "./RoadmapModel.js";
 
 // Faculty/advisor review of a student's career skills. The student invites
 // a faculty member, who rates each competency 1..4 from what they've seen.
+//
+// TEMPORARY: reviews are kept in server memory (lost on restart) until the
+// skill_reviews table from migrations/faculty_skill_reviews.sql is added to
+// the database. Faculty and student names still come from the real tables.
+// Each student starts with one sample review so the page has something to
+// show.
 
 export type ReviewStatus = "PENDING" | "COMPLETE";
 
@@ -16,22 +23,45 @@ export type SkillReview = {
   completedAt: string | null;
 };
 
-const REVIEW_COLUMNS =
-  "id, student_id, faculty_id, status, ratings, comment, requested_at, completed_at";
+type StoredReview = SkillReview & { studentId: number; facultyId: number };
+
+const store: StoredReview[] = [];
+let nextId = 1;
+
+// A made-up reviewer for the sample review; not a real faculty_admin row.
+const SAMPLE_REVIEWER: Reviewer = {
+  id: -1,
+  name: "Prof. Dana Smith (sample)",
+  email: "sample.reviewer@quinnipiac.edu",
+};
+const seededStudents = new Set<number>();
+
+async function seedSample(studentId: number) {
+  if (seededStudents.has(studentId)) return;
+  seededStudents.add(studentId);
+  const sampleScores = [3, 3, 4, 4, 2, 4, 3, 2];
+  const ratings = Object.fromEntries(
+    (await getCompetencies()).map((c, i) => [String(c.id), sampleScores[i % 8] ?? 3]),
+  );
+  store.push({
+    id: nextId++,
+    studentId,
+    facultyId: SAMPLE_REVIEWER.id,
+    status: "COMPLETE",
+    ratings,
+    comment:
+      "This is a sample review. Strong writer who asks sharp questions in class; I'd like to see more leadership in group projects.",
+    requestedAt: new Date(Date.now() - 14 * 864e5).toISOString(),
+    completedAt: new Date(Date.now() - 3 * 864e5).toISOString(),
+  });
+}
+
+const toReview = ({ studentId: _s, facultyId: _f, ...r }: StoredReview): SkillReview => ({
+  ...r,
+});
 
 const fullName = (row: any) =>
   [row?.firstname, row?.lastname].filter(Boolean).join(" ").trim();
-
-function toReview(row: any): SkillReview {
-  return {
-    id: row.id,
-    status: row.status === "COMPLETE" ? "COMPLETE" : "PENDING",
-    ratings: row.ratings ?? {},
-    comment: row.comment ?? null,
-    requestedAt: row.requested_at,
-    completedAt: row.completed_at ?? null,
-  };
-}
 
 export class ReviewError extends Error {
   constructor(
@@ -68,23 +98,36 @@ export async function searchReviewers(query: string): Promise<Reviewer[]> {
   }));
 }
 
-export async function getReviewsForStudent(studentId: number) {
-  const { data, error } = await supabase
-    .from("skill_reviews")
-    .select(
-      `${REVIEW_COLUMNS}, faculty_admin(faculty_id, faculty_qu_email, firstname, lastname)`,
-    )
-    .eq("student_id", studentId)
-    .order("requested_at", { ascending: false });
-  if (error) throw new Error(error.message);
+async function getReviewers(ids: number[]): Promise<Map<number, Reviewer>> {
+  const real = ids.filter((id) => id > 0);
+  const map = new Map<number, Reviewer>([[SAMPLE_REVIEWER.id, SAMPLE_REVIEWER]]);
+  if (real.length === 0) return map;
 
-  return (data ?? []).map((r: any) => ({
-    ...toReview(r),
-    reviewer: {
+  const { data, error } = await supabase
+    .from("faculty_admin")
+    .select("faculty_id, faculty_qu_email, firstname, lastname")
+    .in("faculty_id", real);
+  if (error) throw new Error(error.message);
+  for (const r of data ?? []) {
+    map.set(r.faculty_id, {
       id: r.faculty_id,
-      name: fullName(r.faculty_admin) || r.faculty_admin?.faculty_qu_email || "",
-      email: r.faculty_admin?.faculty_qu_email ?? "",
-    } as Reviewer,
+      name: fullName(r) || r.faculty_qu_email,
+      email: r.faculty_qu_email,
+    });
+  }
+  return map;
+}
+
+export async function getReviewsForStudent(studentId: number) {
+  await seedSample(studentId);
+  const mine = store
+    .filter((r) => r.studentId === studentId)
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+  const reviewers = await getReviewers(mine.map((r) => r.facultyId));
+
+  return mine.map((r) => ({
+    ...toReview(r),
+    reviewer: reviewers.get(r.facultyId) ?? { id: r.facultyId, name: "Faculty member", email: "" },
   }));
 }
 
@@ -97,34 +140,28 @@ export async function inviteReviewer(studentId: number, facultyId: number) {
   if (facultyError) throw new Error(facultyError.message);
   if (!faculty) throw new ReviewError("Faculty member not found", 404);
 
-  const { data: existing, error: existingError } = await supabase
-    .from("skill_reviews")
-    .select("id")
-    .eq("student_id", studentId)
-    .eq("faculty_id", facultyId)
-    .maybeSingle();
-  if (existingError) throw new Error(existingError.message);
-  if (existing)
+  if (store.some((r) => r.studentId === studentId && r.facultyId === facultyId))
     throw new ReviewError("You've already invited this person.", 409);
 
-  const { error } = await supabase
-    .from("skill_reviews")
-    .insert({ student_id: studentId, faculty_id: facultyId });
-  if (error) throw new Error(error.message);
+  store.push({
+    id: nextId++,
+    studentId,
+    facultyId,
+    status: "PENDING",
+    ratings: {},
+    comment: null,
+    requestedAt: new Date().toISOString(),
+    completedAt: null,
+  });
 }
 
 // A student can withdraw an invitation that hasn't been answered yet.
 export async function cancelInvite(studentId: number, reviewId: number) {
-  const { data, error } = await supabase
-    .from("skill_reviews")
-    .delete()
-    .eq("id", reviewId)
-    .eq("student_id", studentId)
-    .eq("status", "PENDING")
-    .select("id");
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0)
-    throw new ReviewError("Invitation not found", 404);
+  const i = store.findIndex(
+    (r) => r.id === reviewId && r.studentId === studentId && r.status === "PENDING",
+  );
+  if (i === -1) throw new ReviewError("Invitation not found", 404);
+  store.splice(i, 1);
 }
 
 // ---------------------------------------------------------------------
@@ -132,25 +169,34 @@ export async function cancelInvite(studentId: number, reviewId: number) {
 // ---------------------------------------------------------------------
 
 export async function getReviewsForFaculty(facultyId: number) {
-  const { data, error } = await supabase
-    .from("skill_reviews")
-    .select(
-      `${REVIEW_COLUMNS}, student(student_id, firstname, lastname, student_qu_email, class_year, major, majors(name))`,
-    )
-    .eq("faculty_id", facultyId)
-    .order("status", { ascending: false }) // PENDING before COMPLETE
-    .order("requested_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  const mine = store
+    .filter((r) => r.facultyId === facultyId)
+    .sort(
+      (a, b) =>
+        Number(a.status === "COMPLETE") - Number(b.status === "COMPLETE") ||
+        b.requestedAt.localeCompare(a.requestedAt),
+    );
+  if (mine.length === 0) return [];
 
-  return (data ?? []).map((r: any) => ({
-    ...toReview(r),
-    student: {
-      name: fullName(r.student) || r.student?.student_qu_email || "",
-      email: r.student?.student_qu_email ?? "",
-      major: r.student?.majors?.name ?? r.student?.major ?? null,
-      classYear: r.student?.class_year ?? null,
-    },
-  }));
+  const { data, error } = await supabase
+    .from("student")
+    .select("student_id, firstname, lastname, student_qu_email, class_year, major, majors(name)")
+    .in("student_id", [...new Set(mine.map((r) => r.studentId))]);
+  if (error) throw new Error(error.message);
+  const students = new Map((data ?? []).map((s: any) => [s.student_id, s]));
+
+  return mine.map((r) => {
+    const s: any = students.get(r.studentId);
+    return {
+      ...toReview(r),
+      student: {
+        name: fullName(s) || s?.student_qu_email || "",
+        email: s?.student_qu_email ?? "",
+        major: s?.majors?.name ?? s?.major ?? null,
+        classYear: s?.class_year ?? null,
+      },
+    };
+  });
 }
 
 export async function submitReview(
@@ -159,18 +205,13 @@ export async function submitReview(
   ratings: Record<string, number>,
   comment: string | null,
 ) {
-  const { data, error } = await supabase
-    .from("skill_reviews")
-    .update({
-      ratings,
-      comment,
-      status: "COMPLETE",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", reviewId)
-    .eq("faculty_id", facultyId)
-    .select(REVIEW_COLUMNS);
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new ReviewError("Review not found", 404);
-  return toReview(data[0]);
+  const r = store.find((x) => x.id === reviewId && x.facultyId === facultyId);
+  if (!r) throw new ReviewError("Review not found", 404);
+  Object.assign(r, {
+    ratings,
+    comment,
+    status: "COMPLETE",
+    completedAt: new Date().toISOString(),
+  });
+  return toReview(r);
 }
