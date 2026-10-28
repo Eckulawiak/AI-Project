@@ -153,36 +153,25 @@ export async function getCompetencies(): Promise<Competency[]> {
     .sort((a, b) => a.id - b.id);
 }
 
-// The courses a major's roadmap and assessment use: the major's required
-// courses from major_courses, or the courses it owns when none are listed.
+// The courses a major's roadmap and assessment use: only the ones every
+// student in the major takes (major_courses REQUIRED). Electives and
+// pick-one courses are left out, and a major with no requirements listed
+// gets no course milestones rather than every course in its subject.
 export async function getRoadmapCoursesForMajor(
   majorId: number,
   competencies: Competency[],
 ): Promise<RoadmapCourse[]> {
-  let courseIds = (
+  const courseIds = (
     await fetchAllPages<{ course_id: number }>((from, to) =>
       supabase
         .from("major_courses")
         .select("course_id")
         .eq("major_id", majorId)
+        .eq("requirement_type", "REQUIRED")
         .order("course_id", { ascending: true })
         .range(from, to),
     )
   ).map((r) => r.course_id);
-
-  if (courseIds.length === 0) {
-    courseIds = (
-      await fetchAllPages<{ course_id: number }>((from, to) =>
-        supabase
-          .from("courses")
-          .select("course_id")
-          .eq("major_id", majorId)
-          .eq("is_active", true)
-          .order("course_id", { ascending: true })
-          .range(from, to),
-      )
-    ).map((r) => r.course_id);
-  }
 
   const courses = await getCoursesByIds(courseIds);
   const mappings = await getMappingsForCourseIds(courses.map((c) => c.course_id));
