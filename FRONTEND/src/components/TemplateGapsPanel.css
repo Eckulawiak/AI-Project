@@ -1,0 +1,147 @@
+.tg-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #131d43;
+  text-align: left;
+}
+
+.tg-head {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.tg-icon {
+  font-size: 1.3rem;
+  background: #fff1cc;
+  color: #7a5800;
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tg-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0.15rem 0 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tg-count {
+  font-size: 0.8rem;
+  background: #131d43;
+  color: #ffb718;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+}
+
+.tg-sub {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.tg-msg {
+  margin: 0.9rem 0 0;
+  color: #374151;
+}
+
+.tg-msg .bi {
+  color: #2f9e6e;
+}
+
+.tg-error {
+  color: #b42318;
+}
+
+.tg-table {
+  margin-top: 1rem;
+  border: 1px solid #e3e6ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tg-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1.2fr 0.8fr 1.1fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid #eef0f5;
+  font-size: 0.92rem;
+  align-items: center;
+}
+
+.tg-row:first-child {
+  border-top: none;
+}
+
+.tg-header {
+  background: #f5f6fa;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+}
+
+.tg-major {
+  font-weight: 600;
+}
+
+.tg-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-more {
+  margin-top: 0.75rem;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: #131d43;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+@media (max-width: 767.98px) {
+  .tg-card {
+    padding: 1rem;
+  }
+
+  .tg-header {
+    display: none;
+  }
+
+  .tg-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.15rem;
+  }
+
+  .tg-row > span:nth-child(2),
+  .tg-row > span:nth-child(3),
+  .tg-row > span:nth-child(5) {
+    grid-column: 1;
+    color: #6b7280;
+    font-size: 0.85rem;
+  }
+
+  .tg-row > .tg-num {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tg-row > .tg-num::after {
+    content: " students";
+    color: #6b7280;
+    font-size: 0.8rem;
+  }
+}

@@ -1,4 +1,5 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { resolveTemplateGap } from "./TemplateGapsModel.js";
 import { chunk, fetchAllPages, getCoursesByIds } from "./CoursesModel.js";
 import { getMappingsForCourseIds } from "./CourseSkillMappingModel.js";
 import { getAllSkillsAndCompetencies } from "./SkillsModel.js";
@@ -374,7 +375,9 @@ async function getTemplateMilestones(templateId: number) {
 async function findRoadmap(studentId: number) {
   const { data, error } = await supabase
     .from("student_roadmaps")
-    .select("id, template_id, generated_at, roadmap_templates(name, major_id)")
+    .select(
+      "id, template_id, generated_at, roadmap_templates(name, school_id, major_id)",
+    )
     .eq("student_id", studentId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -453,8 +456,11 @@ export async function buildRoadmap(
 
   const { template, level } = await selectTemplate(profile);
   // School templates (like the School of Communications framework) cover
-  // their majors; only the university fallback is a gap (REQ-ROAD-9).
+  // their majors; only the university fallback is a gap (REQ-ROAD-9). A
+  // major or school template closes any gap left from before it existed.
   if (level !== "MAJOR" && level !== "SCHOOL") await recordTemplateGap(profile);
+  else if (profile.majorId != null)
+    await resolveTemplateGap(profile.majorId, profile.goalType ?? "INDUSTRY");
 
   const { data: roadmap, error: roadmapError } = await supabase
     .from("student_roadmaps")
@@ -601,7 +607,11 @@ export async function getRoadmapPayload(
     roadmap: {
       id: roadmap.id as number,
       templateName: (roadmap.roadmap_templates?.name ?? null) as string | null,
-      usesDefaultTemplate: roadmap.roadmap_templates?.major_id == null,
+      // Only the university fallback counts as the general roadmap; a school
+      // template is built for the student's school.
+      usesDefaultTemplate:
+        roadmap.roadmap_templates?.school_id == null &&
+        roadmap.roadmap_templates?.major_id == null,
       generatedAt: roadmap.generated_at as string,
     },
     lastAssessmentAt: (assessment.data?.[0]?.completed_at ?? null) as

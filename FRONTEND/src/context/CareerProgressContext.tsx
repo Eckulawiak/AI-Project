@@ -35,6 +35,9 @@ export const CareerProgressProvider: React.FC<{ children: React.ReactNode }> = (
   const [celebration, setCelebration] = useState<CelebrationEvent | null>(null);
   // The session token the current data belongs to.
   const loadedFor = useRef<string | null>(null);
+  // Latest save per milestone, so a slow reply to an earlier click can't
+  // overwrite a newer one when a box is ticked and unticked quickly.
+  const latestSave = useRef(new Map<number, number>());
 
   const milestones = useMemo(() => data?.milestones ?? [], [data]);
 
@@ -118,10 +121,17 @@ export const CareerProgressProvider: React.FC<{ children: React.ReactNode }> = (
         );
       }
 
+      const seq = (latestSave.current.get(id) ?? 0) + 1;
+      latestSave.current.set(id, seq);
+      const isLatest = () => latestSave.current.get(id) === seq;
+
       careerApi
         .setMilestoneStatus(id, status)
-        .then((res) => replaceMilestone(id, () => res.milestone))
+        .then((res) => {
+          if (isLatest()) replaceMilestone(id, () => res.milestone);
+        })
         .catch((e) => {
+          if (!isLatest()) return;
           replaceMilestone(id, (m) => ({ ...m, status: previous }));
           setCelebration(null);
           setError(`Couldn't save "${target.name}". ${errorText(e)}`);

@@ -83,6 +83,12 @@
   color: #b42318;
 }
 
+.roadmap-banner-info {
+  background: #eef2fb;
+  border-color: #c9d4ef;
+  color: #131d43;
+}
+
 .roadmap-banner a {
   color: #131d43;
   text-decoration: underline;
