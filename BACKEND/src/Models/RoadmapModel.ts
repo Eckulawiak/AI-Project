@@ -436,9 +436,13 @@ async function getWeakCompetencyIds(studentId: number) {
 
 // generate / regenerate (SDS 3.1.2). Pending milestones are rebuilt from the
 // current profile, template, course history and latest assessment;
-// completed milestones are kept as history (REQ-ROAD-4).
+// completed milestones are kept as history (REQ-ROAD-4). With fresh (a
+// retaken assessment) every milestone is removed first, so nothing from the
+// old roadmap carries over; courses the student marked completed come back
+// already checked off.
 export async function buildRoadmap(
   studentId: number,
+  { fresh = false }: { fresh?: boolean } = {},
 ): Promise<RoadmapPayload> {
   const profile = await getStudentProfile(studentId);
   const competencies = await getCompetencies();
@@ -466,11 +470,12 @@ export async function buildRoadmap(
   if (roadmapError || !roadmap)
     throw new Error(roadmapError?.message ?? "Could not save roadmap");
 
-  const { error: deleteError } = await supabase
+  let toDelete = supabase
     .from("student_milestones")
     .delete()
-    .eq("roadmap_id", roadmap.id)
-    .eq("status", "PENDING");
+    .eq("roadmap_id", roadmap.id);
+  if (!fresh) toDelete = toDelete.eq("status", "PENDING");
+  const { error: deleteError } = await toDelete;
   if (deleteError) throw new Error(deleteError.message);
 
   const [kept, templateMilestones, courses, history, weak] = await Promise.all([
@@ -733,26 +738,6 @@ export async function addExperienceMilestones(
       .eq("category", "EXPERIENCE")
       .eq("status", "PENDING")
       .ilike("name", "%internship%");
-    if (error) throw new Error(error.message);
-  }
-}
-
-// The assessment is the source of truth for coursework: courses it says are
-// not completed go back to pending so the next build re-checks them.
-export async function reopenCourseMilestones(
-  studentId: number,
-  courseIds: number[],
-) {
-  const roadmap = await findRoadmap(studentId);
-  if (!roadmap || courseIds.length === 0) return;
-
-  for (const ids of chunk(courseIds)) {
-    const { error } = await supabase
-      .from("student_milestones")
-      .update({ status: "PENDING", completed_at: null })
-      .eq("roadmap_id", roadmap.id)
-      .eq("category", "COURSE")
-      .in("course_id", ids);
     if (error) throw new Error(error.message);
   }
 }
