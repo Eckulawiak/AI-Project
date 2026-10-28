@@ -571,6 +571,26 @@ async function clearTables(supabase: SupabaseClient) {
 }
 
 // ── Write to Supabase ───────────────────────────────────────────────────────
+// Retry Supabase requests that die on the network ("fetch failed").
+// A plain insert is not retried: it may have landed before the connection
+// dropped, and courses have no unique key to stop a duplicate. Updates and
+// upserts are safe to repeat.
+const retryingFetch: typeof globalThis.fetch = async (input, init) => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const prefer = new Headers(init?.headers).get("Prefer") ?? "";
+  const attempts = method === "POST" && !prefer.includes("resolution=") ? 1 : 4;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await globalThis.fetch(input, init);
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`  ! Supabase: ${reason} (attempt ${attempt}/${attempts})`);
+      await sleep(1000 * 2 ** attempt);
+    }
+  }
+};
+
 async function writeToSupabase(
   majors: ScrapedMajor[],
   courses: ScrapedCourse[],
@@ -579,6 +599,7 @@ async function writeToSupabase(
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_API_KEY!,
+    { global: { fetch: retryingFetch } },
   );
   const CHUNK = 200;
 
