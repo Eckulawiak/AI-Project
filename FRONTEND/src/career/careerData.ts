@@ -25,17 +25,20 @@ export const CLASS_YEARS: { id: ClassYear; label: string }[] = [
 
 export const RATING_LABELS = ["Just starting", "Developing", "Confident", "Strong"];
 
-// Short explanations for the eight NACE competencies, keyed by a normalized
-// name so "Equity & Inclusion" and "Equity and Inclusion" both match.
+// Plain-language explanations for the eight NACE career readiness
+// competencies, written so they apply to any major or career path. Keyed
+// by a normalized name so "Equity & Inclusion" and "Equity and Inclusion"
+// both match.
 const BLURBS: Record<string, string> = {
-  "career and self-development": "Knowing your strengths and planning your next steps.",
-  communication: "Writing and speaking clearly to different audiences.",
-  "critical thinking": "Analyzing problems and making sound decisions.",
-  "equity and inclusion": "Working respectfully with people of all backgrounds.",
-  leadership: "Guiding a group and helping others do their best.",
-  professionalism: "Reliability, integrity and good work habits.",
-  teamwork: "Collaborating toward a shared goal.",
-  technology: "Using tools and technology effectively and ethically.",
+  "career and self-development":
+    "Knowing what you're good at, what you want to work on, and taking steps toward your goals.",
+  communication: "Sharing your ideas clearly, whether you're talking, writing or listening.",
+  "critical thinking": "Thinking problems through and making good choices.",
+  "equity and inclusion": "Respecting and working well with all kinds of people.",
+  leadership: "Stepping up, motivating others and helping a group succeed.",
+  professionalism: "Being dependable, honest and ready to do your best.",
+  teamwork: "Working well with others to get things done together.",
+  technology: "Learning and using the tools you need, whatever your field.",
 };
 
 export const competencyBlurb = (name: string) =>

@@ -1,5 +1,5 @@
 -- =====================================================================
--- QU Resume Builder - richer roadmap template milestones
+-- Career Services - richer roadmap template milestones
 -- Run after roadmap_progress_assessment.sql. Safe to re-run.
 --
 -- The schools' career development frameworks list, for each year, a

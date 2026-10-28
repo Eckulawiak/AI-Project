@@ -133,7 +133,7 @@ const SkillAssessmentPage: React.FC = () => {
     if (step === 2) {
       const missing = competencies.filter((n) => !ratings[n.id]);
       if (missing.length)
-        return `Please rate every competency (${missing.length} left).`;
+        return `Please rate every skill (${missing.length} left).`;
     }
     return "";
   };
@@ -380,8 +380,9 @@ const SkillAssessmentPage: React.FC = () => {
             <>
               <h2 className="sa-heading">Rate yourself</h2>
               <p className="sa-help">
-                These are the eight NACE career readiness competencies. Be honest —
-                low ratings add helpful milestones to your roadmap.
+                These are eight skills employers look for in every field. Rate
+                where you are today. There are no wrong answers, and lower
+                ratings add helpful suggestions to your roadmap.
               </p>
               <div className="sa-rating-list">
                 {competencies.map((n) => (

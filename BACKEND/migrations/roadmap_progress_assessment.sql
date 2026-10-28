@@ -1,5 +1,5 @@
 -- =====================================================================
--- QU Resume Builder - roadmap, progress tracker and skill assessment
+-- Career Services - roadmap, progress tracker and skill assessment
 -- Run after qu_resume_builder_migration_school_major.sql. Safe to re-run.
 -- =====================================================================
 
@@ -93,7 +93,7 @@ begin
     with seed(goal, category, class_year, name, description, competencies, gap) as (values
       -- Skills
       ('ANY', 'SKILL', 'FIRST',  'Create a LinkedIn profile', 'Add a photo, headline and your major, and connect with classmates and faculty.', array['Career and Self-Development', 'Professionalism'], null),
-      ('ANY', 'SKILL', 'SOPH',   'Draft your first resume', 'Use the Resume Builder to turn your courses into talking points.', array['Career and Self-Development', 'Communication'], null),
+      ('ANY', 'SKILL', 'SOPH',   'Draft your first resume', 'Use Career Services to turn your courses into talking points.', array['Career and Self-Development', 'Communication'], null),
       ('ANY', 'SKILL', 'SOPH',   'Build a portfolio of your work', 'Collect your best class and personal projects in one place you can share.', array['Career and Self-Development', 'Communication', 'Technology'], null),
       ('ANY', 'SKILL', 'JUNIOR', 'Give a presentation on a project', 'Present your work to a class, club or event for about ten minutes.', array['Communication'], null),
       ('INDUSTRY', 'SKILL', 'JUNIOR', 'Practice a mock interview', 'Book a mock interview with Career Development before internship season.', array['Communication', 'Professionalism'], null),

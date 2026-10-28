@@ -70,7 +70,12 @@ export const CareerProgressProvider: React.FC<{ children: React.ReactNode }> = (
     () =>
       milestones
         .filter((x) => x.status === "PENDING")
-        .sort((a, b) => YEAR_ORDER[a.classYear] - YEAR_ORDER[b.classYear])
+        // required first, then by year
+        .sort(
+          (a, b) =>
+            Number(b.required) - Number(a.required) ||
+            YEAR_ORDER[a.classYear] - YEAR_ORDER[b.classYear],
+        )
         .slice(0, 3),
     [milestones],
   );

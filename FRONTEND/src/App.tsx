@@ -44,11 +44,11 @@ const App: React.FC = () => {
         <section className="container-fluid py-5 main-section-center">
           <div className="content-wrapper text-center">
             <h1 className="display-4 fw-bold mb-3 text-color-primary">
-              Welcome to the Quinnipiac Resume Builder
+              Welcome to Quinnipiac Career Services
             </h1>
 
             <h2 className="h4 fw-semibold mb-2 text-color-primary">
-              Add High Quality Talking Points To Your Resume
+              Explore Careers, Build Your Skills, and Plan Your Next Steps
             </h2>
 
             <div className="cta-buttons">

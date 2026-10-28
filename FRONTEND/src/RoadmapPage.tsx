@@ -34,8 +34,10 @@ const RoadmapPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const selected = milestones.find((x) => x.id === selectedId) ?? null;
-  const total = milestones.length;
-  const done = milestones.filter((x) => x.status === "COMPLETE").length;
+  // Progress counts required milestones only; optional ones are extras.
+  const required = milestones.filter((x) => x.required);
+  const total = required.length;
+  const done = required.filter((x) => x.status === "COMPLETE").length;
 
   useEffect(() => {
     if (!selected) return;
@@ -141,7 +143,9 @@ const RoadmapPage: React.FC = () => {
             <div>
               <span className="rm-progress-label">Overall career readiness</span>
               <span className="rm-progress-sub">
-                {done} of {total} milestones complete
+                {done} of {total} required milestones complete
+                {progress.optional.total > 0 &&
+                  ` · ${progress.optional.done} of ${progress.optional.total} optional`}
               </span>
             </div>
             <span className="rm-progress-pct">{progress.overall}%</span>
@@ -257,6 +261,9 @@ const RoadmapPage: React.FC = () => {
                               onClick={() => setSelectedId(ms.id)}
                             >
                               <span className="rm-milestone-name">{ms.name}</span>
+                              {!ms.required && (
+                                <span className="rm-badge rm-badge-optional">Optional</span>
+                              )}
                               {fromAssessment(ms) && (
                                 <span className="rm-badge">From assessment</span>
                               )}
@@ -310,6 +317,12 @@ const RoadmapPage: React.FC = () => {
                   <dd>{selected.component}</dd>
                 </>
               )}
+              <dt>Type</dt>
+              <dd>
+                {selected.required
+                  ? "Required"
+                  : "Optional: recommended, but doesn't count against your progress"}
+              </dd>
               <dt>Suggested year</dt>
               <dd>{yearLabel(selected.classYear)}</dd>
               <dt>Status</dt>
@@ -318,7 +331,7 @@ const RoadmapPage: React.FC = () => {
 
             {selected.competencies.length > 0 && (
               <>
-                <h3 className="rm-panel-sub">Builds these NACE competencies</h3>
+                <h3 className="rm-panel-sub">Skills this helps you build</h3>
                 <div className="rm-comp-list">
                   {selected.competencies.map((c) => (
                     <span key={c.id} className="rm-comp">

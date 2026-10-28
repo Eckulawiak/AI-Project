@@ -51,6 +51,7 @@ export type Milestone = {
   competencies: Competency[];
   component: string | null;
   resources: string[];
+  required: boolean; // optional milestones don't count toward progress
   completedAt: string | null;
 };
 
@@ -77,7 +78,7 @@ export type RoadmapPayload = {
 };
 
 const MILESTONE_COLUMNS =
-  "id, template_milestone_id, course_id, category, class_year, name, description, status, source, competency_ids, component, resources, completed_at, courses(course_code)";
+  "id, template_milestone_id, course_id, category, class_year, name, description, status, source, competency_ids, component, resources, required, completed_at, courses(course_code)";
 
 // ---------------------------------------------------------------------
 // Student profile
@@ -132,7 +133,7 @@ export async function updateStudentProfile(
   const { error } = await supabase
     .from("student")
     .update({
-      major: major.name, // legacy text column the resume builder still reads
+      major: major.name, // legacy text column the talking-points tool still reads
       major_id: major.id,
       class_year: updates.classYear,
       career_goal: updates.careerGoal,
@@ -334,7 +335,7 @@ async function getTemplateMilestones(templateId: number) {
   const { data, error } = await supabase
     .from("template_milestones")
     .select(
-      "id, category, class_year, name, description, course_id, gap_competency_id, component, resources, position, template_milestone_competencies(competency_id)",
+      "id, category, class_year, name, description, course_id, gap_competency_id, component, resources, position, required, template_milestone_competencies(competency_id)",
     )
     .eq("template_id", templateId)
     .order("position", { ascending: true, nullsFirst: false })
@@ -351,6 +352,7 @@ async function getTemplateMilestones(templateId: number) {
     gapCompetencyId: (t.gap_competency_id ?? null) as number | null,
     component: (t.component ?? null) as string | null,
     resources: (t.resources ?? []) as string[],
+    required: t.required !== false,
     competencyIds: ((t.template_milestone_competencies ?? []) as any[]).map(
       (c) => c.competency_id as number,
     ),
@@ -399,6 +401,7 @@ function toMilestone(row: any, lookup: Map<number, Competency>): Milestone {
       .filter((x): x is Competency => !!x),
     component: row.component ?? null,
     resources: row.resources ?? [],
+    required: row.required !== false,
     completedAt: row.completed_at ?? null,
   };
 }
@@ -535,6 +538,8 @@ export async function buildRoadmap(
       competency_ids: t.competencyIds,
       component: t.component,
       resources: t.resources,
+      // suggestions for a low self-rating are always optional
+      required: t.gapCompetencyId == null && t.required,
       status: done ? "COMPLETE" : "PENDING",
       completed_at: done ? now : null,
     });
@@ -557,6 +562,7 @@ export async function buildRoadmap(
       competency_ids: c.competencies.map((x) => x.id),
       component: null,
       resources: [], // rows in one insert must share columns (no defaults)
+      required: true, // major requirements
       status: done ? "COMPLETE" : "PENDING",
       completed_at: done ? now : null,
     });
@@ -710,6 +716,7 @@ export async function addExperienceMilestones(
       description: "Added from your skill assessment.",
       source: "EXPERIENCE",
       competency_ids: [],
+      required: false, // extra experience, not part of the plan
       status: "COMPLETE",
       completed_at: now,
     }))

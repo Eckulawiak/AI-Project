@@ -11,7 +11,7 @@ const Footer: React.FC = () => {
           alt="Quinnipiac University logo"
           className="footer-logo"
         />
-        <span>Quinnipiac Resume Services</span>
+        <span>Quinnipiac Career Services</span>
       </div>
 
       <button type="button" className="footer-link">

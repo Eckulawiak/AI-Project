@@ -58,3 +58,17 @@ where sm.template_milestone_id = tm.id
 update student_milestones
 set required = false
 where source in ('GAP', 'EXPERIENCE') and required;
+
+
+-- ---------------------------------------------------------------------
+-- [4] Rename: the app is now Career Services. Update the one milestone
+-- description that named the old Resume Builder, on templates and on
+-- roadmaps that already copied it.
+-- ---------------------------------------------------------------------
+update template_milestones
+set description = 'Use Career Services to turn your courses into talking points.'
+where description = 'Use the Resume Builder to turn your courses into talking points.';
+
+update student_milestones
+set description = 'Use Career Services to turn your courses into talking points.'
+where description = 'Use the Resume Builder to turn your courses into talking points.';

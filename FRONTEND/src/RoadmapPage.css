@@ -345,6 +345,11 @@
   padding: 0.05rem 0.5rem;
 }
 
+.rm-badge-optional {
+  background: #e8eef5;
+  color: #34506e;
+}
+
 /* Mobile tabs (hidden on desktop) */
 .rm-tabs {
   display: none;
