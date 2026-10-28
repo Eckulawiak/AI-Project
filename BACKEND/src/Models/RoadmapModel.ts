@@ -1,4 +1,5 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { resolveTemplateGap } from "./TemplateGapsModel.js";
 import { chunk, fetchAllPages, getCoursesByIds } from "./CoursesModel.js";
 import { getMappingsForCourseIds } from "./CourseSkillMappingModel.js";
 import { getAllSkillsAndCompetencies } from "./SkillsModel.js";
@@ -445,6 +446,8 @@ export async function buildRoadmap(
 
   const { template, level } = await selectTemplate(profile);
   if (level !== "MAJOR") await recordTemplateGap(profile);
+  else if (profile.majorId != null)
+    await resolveTemplateGap(profile.majorId, profile.goalType ?? "INDUSTRY");
 
   const { data: roadmap, error: roadmapError } = await supabase
     .from("student_roadmaps")

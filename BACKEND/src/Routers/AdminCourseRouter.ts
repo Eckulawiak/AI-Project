@@ -6,7 +6,10 @@ import {
   updateAdminCourseDetails,
   resolveOrCreateSkill,
 } from "../Controllers/AdminCourseController.js";
-import { getUnmappedFlags } from "../Controllers/ProgressController.js";
+import {
+  getTemplateGaps,
+  getUnmappedFlags,
+} from "../Controllers/ProgressController.js";
 
 export const adminCoursesRouter = Router();
 
@@ -16,3 +19,4 @@ adminCoursesRouter.put("/courses/:courseId/mapping", updateAdminCourseMapping);
 adminCoursesRouter.put("/courses/:courseId", updateAdminCourseDetails);
 adminCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
 adminCoursesRouter.get("/unmapped-flags", getUnmappedFlags);
+adminCoursesRouter.get("/template-gaps", getTemplateGaps);

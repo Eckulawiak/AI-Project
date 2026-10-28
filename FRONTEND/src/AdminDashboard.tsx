@@ -5,6 +5,7 @@ import "./AdminDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
 import { useSchools } from "./hooks/useSchools";
+import TemplateGapsPanel from "./components/TemplateGapsPanel";
 
 type CompletionStatus = "Mapped" | "Unmapped";
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
@@ -134,6 +135,8 @@ const AdminDashboard: React.FC = () => {
           <h1 className="admin-title">Admin Dashboard</h1>
           <p className="admin-subtitle">Everything you need, in one place.</p>
         </section>
+
+        <TemplateGapsPanel />
 
         <section className="admin-filter-bar">
           <div className="filter-left">

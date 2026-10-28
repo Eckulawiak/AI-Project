@@ -22,6 +22,7 @@ const RoadmapPage: React.FC = () => {
     loading,
     error,
     profile,
+    roadmap,
     milestones,
     progress,
     lastAssessmentAt,
@@ -97,6 +98,29 @@ const RoadmapPage: React.FC = () => {
           <div className="roadmap-banner" role="status">
             <i className="bi bi-hourglass-split" />
             <span>Building your roadmap…</span>
+          </div>
+        )}
+
+        {/* REQ-ROAD-9: say when this is the general roadmap, not one for the major */}
+        {roadmap?.usesDefaultTemplate && (
+          <div className="roadmap-banner roadmap-banner-info" role="note">
+            <i className="bi bi-signpost-2" />
+            <span>
+              <strong>General roadmap.</strong>{" "}
+              {profile?.major ? (
+                <>
+                  Career Development hasn't built a roadmap for {profile.major} yet,
+                  so this one is shared by all students. Your major's courses are
+                  still included, and we've let them know it's needed.
+                </>
+              ) : (
+                <>
+                  This roadmap is shared by all students.{" "}
+                  <Link to="/skill-assessment">Add your major</Link> to get one
+                  built around your program.
+                </>
+              )}
+            </span>
           </div>
         )}
 

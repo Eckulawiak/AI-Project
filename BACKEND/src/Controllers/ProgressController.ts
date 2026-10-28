@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import { supabase } from "../Database/supabaseClient.js";
 import { getOpenFlags } from "../Models/UnmappedFlagsModel.js";
+import { getOpenTemplateGaps } from "../Models/TemplateGapsModel.js";
 
 const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : "Unknown error";
@@ -41,6 +42,15 @@ export const getAggregateProgress = async (_req: Request, res: Response) => {
 export const getUnmappedFlags = async (_req: Request, res: Response) => {
   try {
     res.json(await getOpenFlags());
+  } catch (e: unknown) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+};
+
+// GET /api/admin/template-gaps -> majors using a default roadmap (REQ-ROAD-9)
+export const getTemplateGaps = async (_req: Request, res: Response) => {
+  try {
+    res.json(await getOpenTemplateGaps());
   } catch (e: unknown) {
     res.status(500).json({ error: errorMessage(e) });
   }
