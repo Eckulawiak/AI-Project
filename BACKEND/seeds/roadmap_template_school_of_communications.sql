@@ -2,7 +2,7 @@
 -- Roadmap template: School of Communications
 -- Source: "Career Mapping Framework - SOC" (Career Development Framework)
 --
--- Run after migrations/roadmap_template_details.sql. Safe to re-run: rows
+-- Run after migrations/required_optional_milestones.sql. Safe to re-run: rows
 -- are matched on (class year, component) and updated in place, so editing
 -- the framework below and running this again keeps students' links.
 --
@@ -11,8 +11,9 @@
 --                     Second-Year -> SOPH, Third-Year -> JUNIOR,
 --                     Fourth-Year/Grad Students -> SENIOR)
 --   Component      -> one milestone; _components below gives its roadmap
---                     category, the name students see, and the NACE
---                     competencies it builds
+--                     category, the name students see, the career skills
+--                     (NACE competencies) it builds, and whether it is
+--                     required or optional
 --   Details        -> resources ("Ways to do this"), one entry per item
 --
 -- To add another school, copy this file, change the school name and
@@ -35,9 +36,10 @@ where s.name = 'School of Communications'
 
 
 -- ---------------------------------------------------------------------
--- [2] Components: category, student-facing name, description, competencies
--- The doc does not name categories or competencies; these are a first
--- pass for Career Development to review.
+-- [2] Components: category, student-facing name, description, competencies,
+-- required. The doc does not name categories, competencies or which
+-- components are optional; these are a first pass for Career Development
+-- to review. Optional components never count against progress.
 -- ---------------------------------------------------------------------
 drop table if exists _components;
 create temp table _components (
@@ -45,46 +47,47 @@ create temp table _components (
   category      text not null,
   name          text not null,
   description   text not null,
-  competencies  text[] not null
+  competencies  text[] not null,
+  required      boolean not null
 );
 
 insert into _components values
   ('Pre-Enrollment', 'EXPERIENCE', 'Attend SOC orientation or a summer camp',
    'Get to know the School of Communications before your first semester.',
-   array['Career and Self-Development']),
+   array['Career and Self-Development'], false),
   ('Reflection and Exploration', 'SKILL', 'Reflect on and explore career paths',
    'Learn what you enjoy and which careers fit, using career tools, events and appointments.',
-   array['Career and Self-Development', 'Critical Thinking']),
+   array['Career and Self-Development', 'Critical Thinking'], true),
   ('Career Course', 'COURSE', 'Take the career course (COM 201)',
    'COM 201 covers career planning, AI tools for the job search, and professional headshots.',
-   array['Career and Self-Development', 'Professionalism', 'Technology']),
+   array['Career and Self-Development', 'Professionalism', 'Technology'], true),
   ('Resume', 'SKILL', 'Build and update your resume',
    'Draft your resume and keep it current with help from Career Development.',
-   array['Communication', 'Career and Self-Development']),
+   array['Communication', 'Career and Self-Development'], true),
   ('Networking', 'EXPERIENCE', 'Grow your professional network',
    'Meet professionals and alumni in your field and keep in touch.',
-   array['Communication', 'Professionalism']),
+   array['Communication', 'Professionalism'], true),
   ('Engagement and Involvement', 'EXPERIENCE', 'Get involved on campus',
    'Join student media and other organizations, and take on leadership as you go.',
-   array['Teamwork', 'Leadership']),
+   array['Teamwork', 'Leadership'], false),
   ('Experiential Learning', 'EXPERIENCE', 'Gain hands-on experience',
    'Put your skills to work in a campus job, agency or student role.',
-   array['Professionalism', 'Teamwork', 'Technology']),
+   array['Professionalism', 'Teamwork', 'Technology'], false),
   ('Internships/Experiential Learning', 'EXPERIENCE', 'Complete an internship or hands-on experience',
    'Take on an internship or another hands-on role in your field.',
-   array['Professionalism', 'Teamwork', 'Technology']),
+   array['Professionalism', 'Teamwork', 'Technology'], true),
   ('Graduate School', 'SKILL', 'Explore graduate school options',
    'Talk with Career Development about whether and when graduate school fits your goals.',
-   array['Career and Self-Development']),
+   array['Career and Self-Development'], false),
   ('Engage Outside World', 'EXPERIENCE', 'Engage with your industry beyond campus',
    'Learn from the industry through programs, trips, festivals and collaborations off campus.',
-   array['Communication', 'Equity and Inclusion']),
+   array['Communication', 'Equity and Inclusion'], false),
   ('Mentorship', 'EXPERIENCE', 'Connect with a mentor',
    'Find an alum or professional who can guide your career.',
-   array['Career and Self-Development', 'Professionalism']),
+   array['Career and Self-Development', 'Professionalism'], false),
   ('Job Search', 'SKILL', 'Run your job search',
    'Search and apply for full-time or freelance work after graduation.',
-   array['Career and Self-Development', 'Professionalism']);
+   array['Career and Self-Development', 'Professionalism'], true);
 
 
 -- ---------------------------------------------------------------------
@@ -199,7 +202,7 @@ com201 as (
   limit 1
 ),
 source as (
-  select f.*, c.category, c.name, c.description,
+  select f.*, c.category, c.name, c.description, c.required,
          case when f.component = 'Career Course'
               then (select course_id from com201) end as course_id
   from _framework f join _components c using (component)
@@ -211,7 +214,8 @@ updated as (
       description = s.description,
       resources   = s.resources,
       position    = s.position,
-      course_id   = s.course_id
+      course_id   = s.course_id,
+      required    = s.required
   from source s, tpl
   where tm.template_id = tpl.id
     and tm.class_year  = s.class_year
@@ -219,8 +223,8 @@ updated as (
   returning tm.id
 )
 insert into template_milestones
-  (template_id, category, class_year, name, description, component, resources, position, course_id)
-select tpl.id, s.category, s.class_year, s.name, s.description, s.component, s.resources, s.position, s.course_id
+  (template_id, category, class_year, name, description, component, resources, position, course_id, required)
+select tpl.id, s.category, s.class_year, s.name, s.description, s.component, s.resources, s.position, s.course_id, s.required
 from source s cross join tpl
 where not exists (
   select 1 from template_milestones tm

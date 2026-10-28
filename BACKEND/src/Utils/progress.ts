@@ -11,19 +11,23 @@ export const THRESHOLDS = [25, 50, 75, 100];
 export type Progress = {
   overall: number;
   byCategory: Record<Category, { done: number; total: number; pct: number }>;
+  optional: { done: number; total: number };
 };
 
 // P(c) = completed(c) / total(c) * 100. The overall figure is the average of
 // the category percentages, so each track counts equally; empty categories
-// are left out.
+// are left out. Only required milestones count; optional ones are tallied
+// separately so they never hold a student back.
 export function computeProgress(
-  milestones: Array<{ category: string; status: string }>,
+  milestones: Array<{ category: string; status: string; required?: boolean | null }>,
 ): Progress {
   const byCategory = {} as Progress["byCategory"];
   const pcts: number[] = [];
+  const required = milestones.filter((m) => m.required !== false);
+  const optional = milestones.filter((m) => m.required === false);
 
   for (const c of CATEGORIES) {
-    const items = milestones.filter((m) => m.category === c);
+    const items = required.filter((m) => m.category === c);
     const done = items.filter((m) => m.status === "COMPLETE").length;
     const pct = items.length ? Math.round((done / items.length) * 100) : 0;
     byCategory[c] = { done, total: items.length, pct };
@@ -33,7 +37,14 @@ export function computeProgress(
   const overall = pcts.length
     ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
     : 0;
-  return { overall, byCategory };
+  return {
+    overall,
+    byCategory,
+    optional: {
+      done: optional.filter((m) => m.status === "COMPLETE").length,
+      total: optional.length,
+    },
+  };
 }
 
 // Highest threshold t with before < t <= after, or null. Going down never

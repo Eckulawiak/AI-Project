@@ -59,6 +59,7 @@ export interface Milestone {
   competencies: Competency[];
   component: string | null; // framework heading, e.g. "Networking"
   resources: string[]; // ways to work on it: courses, offices, events
+  required: boolean; // optional milestones don't count toward progress
   completedAt: string | null;
 }
 
@@ -76,6 +77,7 @@ export interface StudentProfile {
 export interface Progress {
   overall: number;
   byCategory: Record<Category, { done: number; total: number; pct: number }>;
+  optional: { done: number; total: number };
 }
 
 export interface RoadmapResponse {
