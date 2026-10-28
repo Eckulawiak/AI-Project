@@ -132,6 +132,20 @@ const Navbar: React.FC = () => {
               </li>
             )}
 
+            {/* Admin: roadmap template milestones (add, edit, delete) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-milestones")}
+                >
+                  {location.pathname === "/admin-milestones"
+                    ? "Dashboard"
+                    : "Milestones"}
+                </button>
+              </li>
+            )}
+
             {/* Admin Navigation Toggle (checking both Admin and Administrator for DB safety) */}
             {(userType === "Administrator" || userType === "Admin") && (
               <li className="nav-item">

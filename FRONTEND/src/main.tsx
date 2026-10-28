@@ -15,6 +15,7 @@ import HistoryPage from "./HistoryPage";
 import AuditLogsPage from "./AuditLogsPage";
 import FacultyProgressPage from "./FacultyProgressPage";
 import AdminReportsPage from "./AdminReportsPage";
+import AdminMilestonesPage from "./AdminMilestonesPage";
 import SkillAssessmentPage from "./SkillAssessmentPage";
 import RoadmapPage from "./RoadmapPage";
 import { CareerProgressProvider } from "./context/CareerProgressContext";
@@ -105,6 +106,15 @@ createRoot(document.getElementById("root")!).render(
           element={
             <ProtectedRoute allowedTypes={["Administrator"]}>
               <AdminReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin-milestones"
+          element={
+            <ProtectedRoute allowedTypes={["Administrator"]}>
+              <AdminMilestonesPage />
             </ProtectedRoute>
           }
         />
