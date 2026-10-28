@@ -49,6 +49,8 @@ export type Milestone = {
   courseId: number | null;
   courseCode: string | null;
   competencies: Competency[];
+  component: string | null;
+  resources: string[];
   completedAt: string | null;
 };
 
@@ -75,7 +77,7 @@ export type RoadmapPayload = {
 };
 
 const MILESTONE_COLUMNS =
-  "id, template_milestone_id, course_id, category, class_year, name, description, status, source, competency_ids, completed_at, courses(course_code)";
+  "id, template_milestone_id, course_id, category, class_year, name, description, status, source, competency_ids, component, resources, completed_at, courses(course_code)";
 
 // ---------------------------------------------------------------------
 // Student profile
@@ -343,9 +345,10 @@ async function getTemplateMilestones(templateId: number) {
   const { data, error } = await supabase
     .from("template_milestones")
     .select(
-      "id, category, class_year, name, description, course_id, gap_competency_id, template_milestone_competencies(competency_id)",
+      "id, category, class_year, name, description, course_id, gap_competency_id, component, resources, position, template_milestone_competencies(competency_id)",
     )
     .eq("template_id", templateId)
+    .order("position", { ascending: true, nullsFirst: false })
     .order("id", { ascending: true });
   if (error) throw new Error(error.message);
 
@@ -357,6 +360,8 @@ async function getTemplateMilestones(templateId: number) {
     description: (t.description ?? "") as string,
     courseId: (t.course_id ?? null) as number | null,
     gapCompetencyId: (t.gap_competency_id ?? null) as number | null,
+    component: (t.component ?? null) as string | null,
+    resources: (t.resources ?? []) as string[],
     competencyIds: ((t.template_milestone_competencies ?? []) as any[]).map(
       (c) => c.competency_id as number,
     ),
@@ -370,7 +375,9 @@ async function getTemplateMilestones(templateId: number) {
 async function findRoadmap(studentId: number) {
   const { data, error } = await supabase
     .from("student_roadmaps")
-    .select("id, template_id, generated_at, roadmap_templates(name, major_id)")
+    .select(
+      "id, template_id, generated_at, roadmap_templates(name, school_id, major_id)",
+    )
     .eq("student_id", studentId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -401,20 +408,23 @@ function toMilestone(row: any, lookup: Map<number, Competency>): Milestone {
     competencies: ((row.competency_ids ?? []) as number[])
       .map((id) => lookup.get(Number(id)))
       .filter((x): x is Competency => !!x),
+    component: row.component ?? null,
+    resources: row.resources ?? [],
     completedAt: row.completed_at ?? null,
   };
 }
 
 // Identity of a milestone across regenerations, so a completed one is never
-// added a second time.
+// added a second time. A course counts once even when a template lists it
+// in several years or the major also requires it.
 function milestoneKey(row: {
   template_milestone_id?: number | null;
   course_id?: number | null;
   source?: string;
   name: string;
 }) {
-  if (row.template_milestone_id) return `t:${row.template_milestone_id}`;
   if (row.course_id) return `c:${row.course_id}`;
+  if (row.template_milestone_id) return `t:${row.template_milestone_id}`;
   return `${row.source ?? "CUSTOM"}:${row.name.trim().toLowerCase()}`;
 }
 
@@ -445,7 +455,10 @@ export async function buildRoadmap(
   const competencies = await getCompetencies();
 
   const { template, level } = await selectTemplate(profile);
-  if (level !== "MAJOR") await recordTemplateGap(profile);
+  // School templates (like the School of Communications framework) cover
+  // their majors; only the university fallback is a gap (REQ-ROAD-9). A
+  // major or school template closes any gap left from before it existed.
+  if (level !== "MAJOR" && level !== "SCHOOL") await recordTemplateGap(profile);
   else if (profile.majorId != null)
     await resolveTemplateGap(profile.majorId, profile.goalType ?? "INDUSTRY");
 
@@ -481,6 +494,25 @@ export async function buildRoadmap(
     getWeakCompetencyIds(studentId),
   ]);
 
+  // Weak-competency milestones come from the university default when the
+  // chosen template has none of its own.
+  if (
+    level !== "UNIVERSITY" &&
+    !templateMilestones.some((t) => t.gapCompetencyId != null)
+  ) {
+    const fallback = await selectTemplate({
+      ...profile,
+      schoolId: null,
+      majorId: null,
+    });
+    if (fallback.template) {
+      const gaps = (await getTemplateMilestones(fallback.template.id)).filter(
+        (t) => t.gapCompetencyId != null,
+      );
+      templateMilestones.push(...gaps);
+    }
+  }
+
   const existingKeys = new Set(kept.map(milestoneKey));
   const currentYear = profile.classYear
     ? CLASS_YEARS.indexOf(profile.classYear)
@@ -502,6 +534,7 @@ export async function buildRoadmap(
       // only the remaining class years
       continue;
     }
+    const done = t.courseId != null && history.get(t.courseId) === "COMPLETED";
     add({
       template_milestone_id: t.id,
       course_id: t.courseId,
@@ -511,7 +544,10 @@ export async function buildRoadmap(
       description: t.description,
       source: t.gapCompetencyId != null ? "GAP" : "TEMPLATE",
       competency_ids: t.competencyIds,
-      status: "PENDING",
+      component: t.component,
+      resources: t.resources,
+      status: done ? "COMPLETE" : "PENDING",
+      completed_at: done ? now : null,
     });
   }
 
@@ -530,6 +566,8 @@ export async function buildRoadmap(
         : `${c.courseName}.`,
       source: "COURSE",
       competency_ids: c.competencies.map((x) => x.id),
+      component: null,
+      resources: [], // rows in one insert must share columns (no defaults)
       status: done ? "COMPLETE" : "PENDING",
       completed_at: done ? now : null,
     });
@@ -569,7 +607,11 @@ export async function getRoadmapPayload(
     roadmap: {
       id: roadmap.id as number,
       templateName: (roadmap.roadmap_templates?.name ?? null) as string | null,
-      usesDefaultTemplate: roadmap.roadmap_templates?.major_id == null,
+      // Only the university fallback counts as the general roadmap; a school
+      // template is built for the student's school.
+      usesDefaultTemplate:
+        roadmap.roadmap_templates?.school_id == null &&
+        roadmap.roadmap_templates?.major_id == null,
       generatedAt: roadmap.generated_at as string,
     },
     lastAssessmentAt: (assessment.data?.[0]?.completed_at ?? null) as

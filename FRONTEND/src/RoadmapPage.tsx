@@ -292,7 +292,24 @@ const RoadmapPage: React.FC = () => {
             <h2 className="rm-panel-title">{selected.name}</h2>
             <p className="rm-panel-desc">{selected.description}</p>
 
+            {selected.resources.length > 0 && (
+              <>
+                <h3 className="rm-panel-sub">Ways to do this</h3>
+                <ul className="rm-resource-list">
+                  {selected.resources.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+
             <dl className="rm-panel-facts">
+              {selected.component && (
+                <>
+                  <dt>Area</dt>
+                  <dd>{selected.component}</dd>
+                </>
+              )}
               <dt>Suggested year</dt>
               <dd>{yearLabel(selected.classYear)}</dd>
               <dt>Status</dt>
