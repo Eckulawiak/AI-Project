@@ -2,7 +2,7 @@
 // strip. The data itself comes from the /api/roadmap, /api/milestones and
 // /api/assessment routes (see services/careerApi.ts).
 
-export type Category = "COURSE" | "SKILL" | "CERT" | "EXPERIENCE";
+export type Category = "COURSE" | "CAREER_PREP" | "SKILL" | "CERT" | "EXPERIENCE";
 export type ClassYear = "FIRST" | "SOPH" | "JUNIOR" | "SENIOR";
 export type GoalType = "INDUSTRY" | "GRAD";
 export type MilestoneStatus = "PENDING" | "COMPLETE";
@@ -11,6 +11,7 @@ export type CourseStatus = "NONE" | "IN_PROGRESS" | "COMPLETED";
 
 export const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "COURSE", label: "Courses", icon: "bi-journal-bookmark" },
+  { id: "CAREER_PREP", label: "Career Prep", icon: "bi-compass" },
   { id: "SKILL", label: "Skills", icon: "bi-lightning-charge" },
   { id: "CERT", label: "Certifications", icon: "bi-patch-check" },
   { id: "EXPERIENCE", label: "Internships & Experience", icon: "bi-briefcase" },

@@ -11,6 +11,13 @@ import {
   getTemplateGaps,
   getUnmappedFlags,
 } from "../Controllers/ProgressController.js";
+import {
+  addRoadmapTemplateMilestone,
+  editRoadmapTemplateMilestone,
+  getRoadmapTemplateMilestones,
+  getRoadmapTemplates,
+  removeRoadmapTemplateMilestone,
+} from "../Controllers/AdminMilestoneController.js";
 
 export const adminCoursesRouter = Router();
 
@@ -22,3 +29,10 @@ adminCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
 adminCoursesRouter.get("/unmapped-flags", getUnmappedFlags);
 adminCoursesRouter.get("/template-gaps", getTemplateGaps);
 adminCoursesRouter.get("/reports", getAdminReport);
+
+// Roadmap template milestones (add, edit, delete)
+adminCoursesRouter.get("/roadmap-templates", getRoadmapTemplates);
+adminCoursesRouter.get("/roadmap-templates/:templateId/milestones", getRoadmapTemplateMilestones);
+adminCoursesRouter.post("/roadmap-templates/:templateId/milestones", addRoadmapTemplateMilestone);
+adminCoursesRouter.put("/template-milestones/:milestoneId", editRoadmapTemplateMilestone);
+adminCoursesRouter.delete("/template-milestones/:milestoneId", removeRoadmapTemplateMilestone);

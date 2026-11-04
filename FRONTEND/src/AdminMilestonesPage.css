@@ -1,0 +1,118 @@
+/* Admin "Milestones" page. Shares the admin table and edit-modal styles;
+   these are the extras for a five-column table and the add/delete buttons. */
+
+.ms-table .admin-table-row {
+  grid-template-columns: 0.6fr 1.6fr 0.8fr 1.4fr 1.3fr;
+}
+
+.ms-filter-short {
+  width: 150px !important;
+}
+
+.ms-add-button {
+  flex: 0 0 auto;
+  background: #131d43;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.15s ease;
+}
+
+.ms-add-button:hover:not(:disabled) {
+  background: #ffb718;
+  color: #131d43;
+}
+
+.ms-add-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ms-description {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 0.35rem;
+}
+
+.ms-tag {
+  align-self: flex-start;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #131d43;
+  background: #fff4d6;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+.ms-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-self: flex-start;
+}
+
+.ms-delete:hover {
+  color: #dc2626;
+}
+
+.ms-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.6fr;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .ms-filter-short {
+    width: 100% !important;
+  }
+
+  .ms-add-button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .ms-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ms-cell-year::before,
+  .ms-cell-category::before,
+  .ms-cell-resources::before,
+  .ms-cell-competencies::before {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .ms-cell-year::before {
+    content: "Year";
+  }
+
+  .ms-cell-category::before {
+    content: "Category";
+  }
+
+  .ms-cell-resources::before {
+    content: "Ways to do this";
+  }
+
+  .ms-cell-competencies::before {
+    content: "Competencies";
+  }
+
+  .ms-actions {
+    flex-direction: row;
+  }
+}
+
+/* The modal's labels inherit centered text from the page */
+.ms-modal .edit-modal-body {
+  text-align: left;
+}

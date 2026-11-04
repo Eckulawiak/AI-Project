@@ -121,7 +121,7 @@ const Navbar: React.FC = () => {
               </li>
             )}
 
-            {/* Faculty/advisors: rate the students who invited them */}
+            {/* Faculty/advisors: review students' career skills */}
             {(userType === "Faculty/Administrator" ||
               userType === "Administrator" ||
               userType === "Admin") && (
@@ -133,6 +133,20 @@ const Navbar: React.FC = () => {
                   {location.pathname === "/faculty-reviews"
                     ? "Dashboard"
                     : "Student Reviews"}
+                </button>
+              </li>
+            )}
+
+            {/* Admin: roadmap template milestones (add, edit, delete) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-milestones")}
+                >
+                  {location.pathname === "/admin-milestones"
+                    ? "Dashboard"
+                    : "Milestones"}
                 </button>
               </li>
             )}

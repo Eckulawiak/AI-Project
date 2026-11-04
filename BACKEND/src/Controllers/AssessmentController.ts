@@ -12,7 +12,6 @@ import {
   getRoadmapCoursesForMajor,
   getRoadmapPayload,
   getStudentProfile,
-  reopenCourseMilestones,
   saveCourseHistory,
   updateStudentProfile,
 } from "../Models/RoadmapModel.js";
@@ -154,10 +153,6 @@ export const submitAssessment = async (
       goalType,
     });
     await saveCourseHistory(studentId, courses);
-    await reopenCourseMilestones(
-      studentId,
-      courses.filter((c) => c.status !== "COMPLETED").map((c) => c.courseId),
-    );
     const assessment = await saveAssessment(studentId, ratings, experience);
 
     // REQ-SKM-7: never fail the assessment over a flag
@@ -169,7 +164,9 @@ export const submitAssessment = async (
       console.error("Failed to flag unmapped courses:", flagError);
     }
 
-    await buildRoadmap(studentId);
+    // A new assessment starts the roadmap over (completed courses come back
+    // checked off from the course history).
+    await buildRoadmap(studentId, { fresh: true });
     await addExperienceMilestones(studentId, experience);
 
     res.status(201).json({
