@@ -5,6 +5,7 @@
 -- Run after migrations/required_optional_milestones.sql. Safe to re-run: rows
 -- are matched on (class year, component) and updated in place, so editing
 -- the framework below and running this again keeps students' links.
+-- This version never deletes or drops anything.
 --
 -- How the framework maps onto the roadmap:
 --   College phase  -> class_year (Pre-College and First-Year -> FIRST,
@@ -41,8 +42,7 @@ where s.name = 'School of Communications'
 -- components are optional; these are a first pass for Career Development
 -- to review. Optional components never count against progress.
 -- ---------------------------------------------------------------------
-drop table if exists _components;
-create temp table _components (
+create temp table if not exists _components (
   component     text primary key,
   category      text not null,
   name          text not null,
@@ -87,18 +87,22 @@ insert into _components values
    array['Career and Self-Development', 'Professionalism'], false),
   ('Job Search', 'SKILL', 'Run your job search',
    'Search and apply for full-time or freelance work after graduation.',
-   array['Career and Self-Development', 'Professionalism'], true);
+   array['Career and Self-Development', 'Professionalism'], true)
+on conflict (component) do update
+set category = excluded.category, name = excluded.name,
+    description = excluded.description, competencies = excluded.competencies,
+    required = excluded.required;
 
 
 -- ---------------------------------------------------------------------
 -- [3] The framework, one row per (college phase, component)
 -- ---------------------------------------------------------------------
-drop table if exists _framework;
-create temp table _framework (
+create temp table if not exists _framework (
   position    int  not null,
   class_year  text not null,
   component   text not null,
-  resources   text[] not null
+  resources   text[] not null,
+  primary key (class_year, component)
 );
 
 insert into _framework values
@@ -159,7 +163,9 @@ insert into _framework values
   (28, 'SENIOR', 'Mentorship',
    array['Alumni events', 'ESPN Mentorship program']),
   (29, 'SENIOR', 'Networking',
-   array['LinkedIn', 'Class visits', 'Alumni events', 'Off-campus conferences/trips', 'MSS alumni panel', 'Cannes Film Festival', 'Sundance Film Festival']);
+   array['LinkedIn', 'Class visits', 'Alumni events', 'Off-campus conferences/trips', 'MSS alumni panel', 'Cannes Film Festival', 'Sundance Film Festival'])
+on conflict (class_year, component) do update
+set position = excluded.position, resources = excluded.resources;
 
 
 -- ---------------------------------------------------------------------
@@ -233,29 +239,9 @@ where not exists (
     and tm.component   = s.component
 );
 
--- Rows removed from the framework are removed from the template. Students
--- keep any they already completed.
-delete from template_milestones tm
-using roadmap_templates t, schools s
-where tm.template_id = t.id
-  and t.school_id = s.id and s.name = 'School of Communications'
-  and t.major_id is null and t.goal_type = 'ANY'
-  and not exists (
-    select 1 from _framework f
-    where f.class_year = tm.class_year and f.component = tm.component
-  );
-
-
 -- ---------------------------------------------------------------------
--- [6] Competencies for each milestone (replaced on every run)
+-- [6] Competencies for each milestone (added if missing)
 -- ---------------------------------------------------------------------
-delete from template_milestone_competencies tmc
-using template_milestones tm, roadmap_templates t, schools s
-where tmc.template_milestone_id = tm.id
-  and tm.template_id = t.id
-  and t.school_id = s.id and s.name = 'School of Communications'
-  and t.major_id is null and t.goal_type = 'ANY';
-
 insert into template_milestone_competencies (template_milestone_id, competency_id)
 select distinct tm.id, sk.skill_id
 from template_milestones tm
@@ -268,5 +254,3 @@ where s.name = 'School of Communications'
   and t.major_id is null and t.goal_type = 'ANY'
 on conflict do nothing;
 
-drop table _framework;
-drop table _components;
