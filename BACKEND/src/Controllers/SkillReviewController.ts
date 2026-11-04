@@ -3,12 +3,10 @@ import { getLatestAssessment } from "../Models/AssessmentModel.js";
 import { getCompetencies } from "../Models/RoadmapModel.js";
 import {
   ReviewError,
-  cancelInvite,
-  getReviewsForFaculty,
+  findStudentsToReview,
+  getReviewsByFaculty,
   getReviewsForStudent,
-  inviteReviewer,
-  searchReviewers,
-  submitReview,
+  saveReview,
 } from "../Models/SkillReviewModel.js";
 
 const fail = (res: Response, e: unknown) => {
@@ -17,17 +15,12 @@ const fail = (res: Response, e: unknown) => {
   res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
 };
 
-const idParam = (req: Request) => {
-  const id = Number(req.params.id);
-  return Number.isInteger(id) && id > 0 ? id : null;
-};
-
 // ---------------------------------------------------------------------
 // Student: /api/reviews
 // ---------------------------------------------------------------------
 
-// GET /api/reviews -> the student's invitations, the eight competencies
-// and their own latest self-ratings to compare against.
+// GET /api/reviews -> reviews faculty have written about the student, the
+// eight competencies, and the student's own latest self-ratings.
 export const getMyReviews = async (req: Request, res: Response) => {
   try {
     const studentId = req.user!.userId;
@@ -42,49 +35,15 @@ export const getMyReviews = async (req: Request, res: Response) => {
   }
 };
 
-// GET /api/reviews/reviewers?q= -> faculty the student can invite
-export const findReviewers = async (req: Request, res: Response) => {
-  try {
-    res.json(await searchReviewers(String(req.query.q ?? "")));
-  } catch (e) {
-    fail(res, e);
-  }
-};
-
-// POST /api/reviews { facultyId }
-export const createInvite = async (req: Request, res: Response) => {
-  try {
-    const facultyId = Number(req.body?.facultyId);
-    if (!Number.isInteger(facultyId) || facultyId <= 0)
-      return res.status(400).json({ error: "Please choose who to invite." });
-    await inviteReviewer(req.user!.userId, facultyId);
-    res.status(201).json(await getReviewsForStudent(req.user!.userId));
-  } catch (e) {
-    fail(res, e);
-  }
-};
-
-// DELETE /api/reviews/:id -> withdraw a pending invitation
-export const deleteInvite = async (req: Request, res: Response) => {
-  try {
-    const id = idParam(req);
-    if (!id) return res.status(400).json({ error: "Invalid id" });
-    await cancelInvite(req.user!.userId, id);
-    res.status(204).end();
-  } catch (e) {
-    fail(res, e);
-  }
-};
-
 // ---------------------------------------------------------------------
 // Faculty: /api/faculty/reviews
 // ---------------------------------------------------------------------
 
-// GET /api/faculty/reviews -> invitations sent to this faculty member
+// GET /api/faculty/reviews -> reviews this faculty member has written
 export const getFacultyReviews = async (req: Request, res: Response) => {
   try {
     const [reviews, competencies] = await Promise.all([
-      getReviewsForFaculty(req.user!.userId),
+      getReviewsByFaculty(req.user!.userId),
       getCompetencies(),
     ]);
     res.json({ reviews, competencies });
@@ -93,12 +52,25 @@ export const getFacultyReviews = async (req: Request, res: Response) => {
   }
 };
 
-// PUT /api/faculty/reviews/:id { ratings, comment }
+// GET /api/faculty/reviews/students?q= -> students to review: search
+// results, or the students in the faculty member's majors.
+export const getStudentsToReview = async (req: Request, res: Response) => {
+  try {
+    res.json(
+      await findStudentsToReview(req.user!.userId, String(req.query.q ?? "")),
+    );
+  } catch (e) {
+    fail(res, e);
+  }
+};
+
+// PUT /api/faculty/reviews/students/:studentId { ratings, comment }
 // Every competency rated 1..4; the comment is optional.
 export const saveFacultyReview = async (req: Request, res: Response) => {
   try {
-    const id = idParam(req);
-    if (!id) return res.status(400).json({ error: "Invalid id" });
+    const studentId = Number(req.params.studentId);
+    if (!Number.isInteger(studentId) || studentId <= 0)
+      return res.status(400).json({ error: "Invalid student" });
 
     const ratings: Record<string, number> = {};
     for (const comp of await getCompetencies()) {
@@ -117,7 +89,7 @@ export const saveFacultyReview = async (req: Request, res: Response) => {
         .json({ error: "Comment must be 2000 characters or fewer." });
 
     res.json(
-      await submitReview(req.user!.userId, id, ratings, comment || null),
+      await saveReview(req.user!.userId, studentId, ratings, comment || null),
     );
   } catch (e) {
     fail(res, e);

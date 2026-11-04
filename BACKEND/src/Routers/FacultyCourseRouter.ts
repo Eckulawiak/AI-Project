@@ -14,6 +14,7 @@ import {
 import { getAggregateProgress } from "../Controllers/ProgressController.js";
 import {
   getFacultyReviews,
+  getStudentsToReview,
   saveFacultyReview,
 } from "../Controllers/SkillReviewController.js";
 
@@ -26,6 +27,7 @@ facultyCoursesRouter.get("/skills-options", getSkillsOptions);
 facultyCoursesRouter.get("/courses/:courseId/mapping", getCourseMapping);
 facultyCoursesRouter.get("/progress", RequireFaculty, getAggregateProgress);
 facultyCoursesRouter.get("/reviews", RequireFaculty, getFacultyReviews);
+facultyCoursesRouter.get("/reviews/students", RequireFaculty, getStudentsToReview);
 
 // --- Validation Routes (Must go before generic /:courseId routes) ---
 facultyCoursesRouter.get("/courses/check-code", checkCourseCode);
@@ -35,4 +37,8 @@ facultyCoursesRouter.post("/courses", createNewCourse);
 facultyCoursesRouter.put("/courses/:courseId/mapping", updateCourseMapping);
 facultyCoursesRouter.put("/courses/:courseId/claim", claimCourse);
 facultyCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
-facultyCoursesRouter.put("/reviews/:id", RequireFaculty, saveFacultyReview);
+facultyCoursesRouter.put(
+  "/reviews/students/:studentId",
+  RequireFaculty,
+  saveFacultyReview,
+);
