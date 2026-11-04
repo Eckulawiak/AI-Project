@@ -492,7 +492,7 @@ const StudentDashboard: React.FC = () => {
         <section className="dashboard-title-block">
           <h1 className="dashboard-title">Student Dashboard</h1>
           <p className="dashboard-subtitle">
-            Everything you need, in one place.
+            Your career services tools, all in one place.
           </p>
         </section>
 

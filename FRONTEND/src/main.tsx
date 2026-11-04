@@ -18,6 +18,8 @@ import AdminReportsPage from "./AdminReportsPage";
 import AdminMilestonesPage from "./AdminMilestonesPage";
 import SkillAssessmentPage from "./SkillAssessmentPage";
 import RoadmapPage from "./RoadmapPage";
+import SkillReviewsPage from "./SkillReviewsPage";
+import FacultyReviewsPage from "./FacultyReviewsPage";
 import { CareerProgressProvider } from "./context/CareerProgressContext";
 
 createRoot(document.getElementById("root")!).render(
@@ -63,6 +65,15 @@ createRoot(document.getElementById("root")!).render(
           }
         />
 
+        <Route
+          path="/skill-reviews"
+          element={
+            <ProtectedRoute allowedTypes={["Student"]}>
+              <SkillReviewsPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Faculty only */}
         <Route
           path="/facultyAdmin"
@@ -98,6 +109,14 @@ createRoot(document.getElementById("root")!).render(
           element={
             <ProtectedRoute allowedTypes={["Faculty/Administrator", "Administrator"]}>
               <FacultyProgressPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/faculty-reviews"
+          element={
+            <ProtectedRoute allowedTypes={["Faculty/Administrator", "Administrator"]}>
+              <FacultyReviewsPage />
             </ProtectedRoute>
           }
         />

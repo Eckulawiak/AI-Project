@@ -39,12 +39,14 @@ export interface CareerProgressValue {
 }
 
 // Same formula as the server (SDS 3.1.2, ProgressService), so the bar can
-// move as soon as a box is ticked.
+// move as soon as a box is ticked. Only required milestones count.
 export function computeProgress(milestones: Milestone[]): Progress {
   const byCategory = {} as Progress["byCategory"];
   const pcts: number[] = [];
+  const required = milestones.filter((x) => x.required);
+  const optional = milestones.filter((x) => !x.required);
   for (const c of CATEGORIES) {
-    const items = milestones.filter((x) => x.category === c.id);
+    const items = required.filter((x) => x.category === c.id);
     const done = items.filter((x) => x.status === "COMPLETE").length;
     const pct = items.length ? Math.round((done / items.length) * 100) : 0;
     byCategory[c.id] = { done, total: items.length, pct };
@@ -54,7 +56,14 @@ export function computeProgress(milestones: Milestone[]): Progress {
   const overall = pcts.length
     ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
     : 0;
-  return { overall, byCategory };
+  return {
+    overall,
+    byCategory,
+    optional: {
+      done: optional.filter((x) => x.status === "COMPLETE").length,
+      total: optional.length,
+    },
+  };
 }
 
 export function crossedThreshold(before: number, after: number): number | null {

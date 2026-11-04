@@ -221,7 +221,7 @@ async function sendResetEmail(toEmail: string, code: string): Promise<void> {
   });
 
   await transporter.sendMail({
-    from: `"QU App" <${process.env.GMAIL_USER}>`,
+    from: `"QU Career Services" <${process.env.GMAIL_USER}>`,
     to: toEmail,
     subject: "Your Password Reset Code",
     html: `

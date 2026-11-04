@@ -132,7 +132,7 @@ router.post("/generate", async (req, res) => {
             Authorization: `Bearer ${API_KEY}`,
             "Content-Type": "application/json",
             "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "Student Resume Dashboard",
+            "X-Title": "QU Career Services",
           },
           body: JSON.stringify(payload),
         });

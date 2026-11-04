@@ -31,6 +31,7 @@ type MilestoneRow = {
   status: string;
   source: string | null;
   name: string;
+  required: boolean | null;
 };
 
 // One student's roadmap, already stripped of who they are.
@@ -122,7 +123,7 @@ export async function loadCohort(majorIds: number[] | null): Promise<CohortMembe
       rows = await fetchAllPages<MilestoneRow>((from, to) =>
         supabase
           .from("student_milestones")
-          .select("roadmap_id, category, class_year, status, source, name")
+          .select("roadmap_id, category, class_year, status, source, name, required")
           .in("roadmap_id", ids)
           .order("id", { ascending: true })
           .range(from, to),
