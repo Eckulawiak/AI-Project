@@ -19,6 +19,7 @@ import AdminMilestonesPage from "./AdminMilestonesPage";
 import SkillAssessmentPage from "./SkillAssessmentPage";
 import RoadmapPage from "./RoadmapPage";
 import SkillReviewsPage from "./SkillReviewsPage";
+import ResumePage from "./ResumePage";
 import FacultyReviewsPage from "./FacultyReviewsPage";
 import { CareerProgressProvider } from "./context/CareerProgressContext";
 
@@ -61,6 +62,15 @@ createRoot(document.getElementById("root")!).render(
           element={
             <ProtectedRoute allowedTypes={["Student"]}>
               <RoadmapPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/resume"
+          element={
+            <ProtectedRoute allowedTypes={["Student"]}>
+              <ResumePage />
             </ProtectedRoute>
           }
         />

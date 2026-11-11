@@ -1,0 +1,364 @@
+/* Resume page: inputs on the left, the editable resume on the right. */
+
+.rp-main {
+  text-align: left;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.rp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rp-who {
+  color: #6b7280;
+}
+
+.rp-save {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rp-save-status {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.rp-save .btn-generate:disabled,
+.rp-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rp-alert {
+  background: #fdecec;
+  color: #8a1c1c;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.rp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.rp-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  min-width: 0;
+}
+
+/* the projects picker is built for the full-width dashboard */
+.rp-panel .class-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* --- classes --- */
+.rp-search {
+  margin-bottom: 0.5rem;
+}
+
+.rp-class-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid #eef0f5;
+  border-radius: 10px;
+}
+
+.rp-class {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #eef0f5;
+}
+
+.rp-class:last-child {
+  border-bottom: none;
+}
+
+.rp-class-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.rp-class-label input {
+  margin-top: 0.2rem;
+  accent-color: #131d43;
+}
+
+.rp-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  background: #e3f4e8;
+  color: #1d6b38;
+}
+
+.rp-tag-in {
+  background: #e8eef5;
+  color: #34506e;
+}
+
+.rp-version {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid #cfd4e2;
+  border-radius: 8px;
+  max-width: 100%;
+}
+
+.rp-generate {
+  width: 100%;
+  margin-top: 1.25rem;
+  min-height: 44px;
+}
+
+.rp-privacy {
+  margin-top: 0.75rem;
+}
+
+/* --- the resume --- */
+.rp-resume-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.rp-resume-head .card-title {
+  margin: 0;
+}
+
+.rp-empty {
+  margin: 1rem 0;
+}
+
+.rp-block {
+  border: 1px solid #eef0f5;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-top: 0.9rem;
+}
+
+.rp-block.loading {
+  background: #fafbfd;
+}
+
+.rp-block.error {
+  border-color: #f2c9c9;
+}
+
+.rp-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rp-block-title {
+  min-width: 0;
+}
+
+.rp-block-title h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #131d43;
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.rp-kind {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7a5800;
+}
+
+.rp-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rp-icon,
+.rp-text-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #131d43;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.45rem;
+  cursor: pointer;
+}
+
+.rp-text-btn {
+  border-color: #cfd4e2;
+  font-weight: 600;
+}
+
+.rp-icon:hover:not(:disabled),
+.rp-text-btn:hover:not(:disabled) {
+  background: #f1f3f9;
+}
+
+.rp-icon:disabled,
+.rp-text-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.rp-icon:focus-visible,
+.rp-text-btn:focus-visible,
+.rp-bullet-input:focus-visible {
+  outline: 2px solid #ffb718;
+  outline-offset: 1px;
+}
+
+.rp-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.rp-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #e1e4ee;
+  border-top-color: #131d43;
+  border-radius: 50%;
+  animation: rp-spin 0.8s linear infinite;
+}
+
+@keyframes rp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-spinner {
+    animation: none;
+  }
+}
+
+.rp-block-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: #fdecec;
+  color: #8a1c1c;
+  font-size: 0.88rem;
+}
+
+.rp-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rp-bullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.rp-dot {
+  color: #131d43;
+  line-height: 1.9;
+}
+
+.rp-bullet-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #131d43;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+}
+
+.rp-bullet-input:hover {
+  border-color: #e1e4ee;
+}
+
+.rp-bullet-input:focus {
+  border-color: #131d43;
+  background: #ffffff;
+}
+
+.rp-edited {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #7a5800;
+  background: #fff1cc;
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  margin-top: 0.45rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .rp-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .rp-panel {
+    padding: 1.1rem 1rem;
+  }
+
+  .rp-save {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rp-edited {
+    display: none;
+  }
+}

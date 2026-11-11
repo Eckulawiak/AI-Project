@@ -5,6 +5,7 @@
 import { supabase } from "../Database/supabaseClient.js";
 import { getMappingsForCourseIds } from "./CourseSkillMappingModel.js";
 import { getProjectsByIds } from "./StudentProjectsModel.js";
+import { redactSensitive } from "../Utils/aiSafety.js";
 
 export type GenerationMode = "skills" | "talkingPoints";
 
@@ -84,7 +85,9 @@ export function parseResumeRequest(
 const toLabel = (text: string) =>
   text.replace(/[^A-Za-z0-9 &+#.\-/]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
 
-const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+// Free text bound for the AI, on one line, with grades and personal
+// identifiers removed (REQ-RES-8).
+const oneLine = (text: string) => redactSensitive(text.replace(/\s+/g, " ").trim());
 
 export async function loadResumeInput(
   studentId: number,
@@ -116,7 +119,9 @@ export async function loadResumeInput(
       const row = byId.get(id);
       const mapped = mappings.get(id);
       if (!row || !mapped) continue;
-      const skills = [...new Set([...mapped.skills, ...mapped.competencies])];
+      const skills = [...new Set([...mapped.skills, ...mapped.competencies].map(oneLine))].filter(
+        Boolean,
+      );
       if (skills.length === 0) continue;
 
       const code = String(row.course_code ?? "").trim();
@@ -130,16 +135,17 @@ export async function loadResumeInput(
   // Projects: only this student's, so another student's ids are ignored.
   const projects: ProjectBlock[] = [];
   for (const p of await getProjectsByIds(studentId, request.projectIds)) {
-    const label = unique(toLabel(p.title));
+    const label = unique(toLabel(oneLine(p.title)));
     projects.push({
       label,
-      description: p.description ? oneLine(p.description) : null,
-      skills: p.skills.map(oneLine),
+      description: p.description ? oneLine(p.description) || null : null,
+      skills: p.skills.map(oneLine).filter(Boolean),
     });
     sections.push({ kind: "project", label, projectId: p.id, title: p.title });
   }
 
-  return { courses, projects, careerGoals: request.careerGoals, sections };
+  const careerGoals = request.careerGoals.map(oneLine).filter(Boolean);
+  return { courses, projects, careerGoals, sections };
 }
 
 function inputBlocks(input: ResumeInput) {

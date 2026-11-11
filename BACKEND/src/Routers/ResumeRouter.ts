@@ -1,34 +1,19 @@
 // BACKEND/src/Routers/ResumeRouter.ts
 import express from "express";
-import { supabase } from "../Database/supabaseClient.js";
 import {
   buildResumePrompt,
   buildTalkingPointsPrompt,
   loadResumeInput,
   parseResumeRequest,
 } from "../Models/ResumeInputModel.js";
+import { generateBlocks } from "../Models/ResumeBlocksModel.js";
+import { getDraft, parseDraft, saveDraft } from "../Models/ResumeDraftModel.js";
+import { getCourseHistory, getStudentProfile } from "../Models/RoadmapModel.js";
+import { completeWithFallback } from "../Utils/openRouter.js";
 
 const router = express.Router();
 
-// One row per generation request for the admin report and AI budget
-// (SDS C9, ai_usage_log). Never stores the prompt or who asked. A failed
-// write is logged and ignored so it can't break generation.
-function logAiUsage(row: {
-  feature: "RESUME" | "SKILL_SUGGEST" | "INTERVIEW";
-  model: string;
-  latency_ms: number;
-  success: boolean;
-  fell_back: boolean;
-  prompt_tokens?: number | null;
-  completion_tokens?: number | null;
-}) {
-  supabase
-    .from("ai_usage_log")
-    .insert(row)
-    .then(({ error }) => {
-      if (error) console.error("Failed to log AI usage:", error.message);
-    });
-}
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : "Unknown error");
 
 // Mounted behind RequireStudent. The body holds only what the student
 // picked (REQ-RES-1): { mode, courseIds, projectIds, careerGoals }. Skills
@@ -54,101 +39,78 @@ router.post("/generate", async (req, res) => {
         ? buildResumePrompt(input)
         : buildTalkingPointsPrompt(input);
 
-    const API_KEY = process.env.AIAPIKEY;
-    const OPENROUTER_URL = process.env.OPEN_ROUTER_URL;
-
-    if (!API_KEY || !OPENROUTER_URL) {
-      throw new Error("Missing OpenRouter credentials in backend environment.");
-    }
-
-    // 1. Define our cascade of models from the .env file
-    const fallbackModels = [
-      process.env.VITE_MODEL_ID_1,
-      process.env.VITE_MODEL_ID_2,
-      process.env.VITE_MODEL_ID_3,
-    ].filter(Boolean) as string[]; // filter(Boolean) removes any undefined ones
-
-    if (fallbackModels.length === 0) {
-      throw new Error("No models defined in environment variables.");
-    }
-
-    let lastError: any = null;
     // ai_usage_log.feature only allows RESUME, SKILL_SUGGEST and INTERVIEW;
     // talking points are interview prep.
-    const feature = mode === "skills" ? "RESUME" : "INTERVIEW";
-    const started = Date.now();
-
-    // 2. Loop through the models. If one fails, try the next.
-    for (const currentModel of fallbackModels) {
-      try {
-        console.log(`Attempting generation with model: ${currentModel}`);
-
-        const payload = {
-          model: currentModel,
-          messages: [{ role: "user", content: prompt }],
-        };
-
-        const response = await fetch(OPENROUTER_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "QU Career Services",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        // If the API call itself fails (e.g., 502 Bad Gateway, 429 Rate Limit)
-        if (!response.ok) {
-          const errBody = await response.text();
-          throw new Error(`HTTP ${response.status}: ${errBody}`);
-        }
-
-        const result = await response.json();
-        const text = result.choices?.[0]?.message?.content?.trim();
-
-        // Heuristic for a "bad response" - if it's empty or suspiciously short
-        if (!text || text.length < 10) {
-          throw new Error("Response was empty or invalid.");
-        }
-
-        // 3. SUCCESS! Send the response to the frontend and exit the function.
-        console.log(`Success with ${currentModel}`);
-        logAiUsage({
-          feature,
-          model: currentModel,
-          latency_ms: Date.now() - started,
-          success: true,
-          fell_back: currentModel !== fallbackModels[0],
-          prompt_tokens: result.usage?.prompt_tokens ?? null,
-          completion_tokens: result.usage?.completion_tokens ?? null,
-        });
-        return res.status(200).json({ text, sections: input.sections });
-      } catch (err: any) {
-        // Log the failure, save the error, and let the loop continue to the next model
-        console.warn(`Model ${currentModel} failed:`, err.message);
-        lastError = err;
-      }
+    const text = await completeWithFallback(prompt, {
+      feature: mode === "skills" ? "RESUME" : "INTERVIEW",
+      validate: (reply) => {
+        if (reply.length < 10) throw new Error("Response was empty or invalid.");
+      },
+    });
+    if (text == null) {
+      return res.status(500).json({
+        error: "Failed to generate AI content. Please try again later.",
+      });
     }
-
-    // 4. If the loop finishes without returning, it means ALL models failed.
-    console.error("All fallback models exhausted. Last error:", lastError);
-    logAiUsage({
-      feature,
-      model: fallbackModels[fallbackModels.length - 1] ?? "unknown",
-      latency_ms: Date.now() - started,
-      success: false,
-      fell_back: fallbackModels.length > 1,
-    });
-    return res.status(500).json({
-      error: "Failed to generate AI content. Please try again later.",
-    });
+    return res.status(200).json({ text, sections: input.sections });
   } catch (error: any) {
     console.error("Backend AI Generation Error:", error);
     return res
       .status(500)
       .json({ error: "An unexpected error occurred. Please try again." });
+  }
+});
+
+// GET /resume/options -> who the resume is for: the student's profile
+// and the course ids they've completed, to pre-select on the resume page.
+router.get("/options", async (req, res) => {
+  try {
+    const studentId = req.user!.userId;
+    const [profile, history] = await Promise.all([
+      getStudentProfile(studentId),
+      getCourseHistory(studentId),
+    ]);
+    const completedCourseIds = [...history]
+      .filter(([, status]) => status === "COMPLETED")
+      .map(([id]) => id);
+    res.json({ profile, completedCourseIds });
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+});
+
+// POST /resume/blocks { courseIds, projectIds, careerGoals }
+// One block of bullet points per course and project (REQ-RES-2). To
+// regenerate a single block, send just that course or project (REQ-RES-5).
+router.post("/blocks", async (req, res) => {
+  try {
+    const parsed = parseResumeRequest({ ...req.body, mode: "skills" });
+    if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+    const blocks = await generateBlocks(req.user!.userId, parsed.request);
+    res.json({ blocks });
+  } catch (e) {
+    console.error("Resume block generation failed:", e);
+    res.status(500).json({ error: "Couldn't generate bullet points. Try again." });
+  }
+});
+
+// GET /resume/draft -> the student's saved resume, or no blocks
+router.get("/draft", async (req, res) => {
+  try {
+    res.json(await getDraft(req.user!.userId));
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+});
+
+// PUT /resume/draft { blocks } -> save the resume, edits included (REQ-RES-4)
+router.put("/draft", async (req, res) => {
+  try {
+    const parsed = parseDraft(req.body);
+    if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+    res.json(await saveDraft(req.user!.userId, parsed.blocks));
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
   }
 });
 

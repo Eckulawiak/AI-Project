@@ -522,3 +522,16 @@
     min-height: 44px;
   }
 }
+
+/* Link from the talking-points generator to the Resume page */
+.dash-resume-link {
+  color: #131d43;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dash-resume-link:hover {
+  color: #7a5800;
+}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
@@ -48,8 +49,9 @@ const StudentDashboard: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [generationMode, setGenerationMode] =
-    useState<GenerationMode>("skills");
+  // Resume bullet points have their own page (/resume); the dashboard
+  // writes interview talking points.
+  const generationMode: GenerationMode = "talkingPoints";
 
   const [majorClasses, setMajorClasses] = useState<ClassOption[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState<boolean>(false);
@@ -270,9 +272,7 @@ const StudentDashboard: React.FC = () => {
         return;
       }
       setBullets([
-        generationMode === "skills"
-          ? "Select at least one class or project to generate bullet points."
-          : "Select at least one class or project to generate talking points.",
+        "Select at least one class or project to generate talking points.",
       ]);
       return;
     }
@@ -284,9 +284,7 @@ const StudentDashboard: React.FC = () => {
     if (bullets.length === 0) return;
     navigator.clipboard.writeText(bullets.join("\n"));
     alert(
-      generationMode === "skills"
-        ? "Bullet points copied to clipboard!"
-        : "Talking points copied to clipboard!",
+      "Talking points copied to clipboard!",
     );
   };
 
@@ -298,9 +296,7 @@ const StudentDashboard: React.FC = () => {
     const a = document.createElement("a");
     a.href = url;
     a.download =
-      generationMode === "skills"
-        ? "generated-bullet-points.txt"
-        : "generated-talking-points.txt";
+      "generated-talking-points.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -625,41 +621,10 @@ const StudentDashboard: React.FC = () => {
                   flexWrap: "wrap",
                 }}
               >
-                <div className="generation-toggle-wrap">
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "skills" ? "active" : ""
-                    }`}
-                  >
-                    Skill Generation
-                  </span>
-
-                  <button
-                    type="button"
-                    className={`generation-toggle ${
-                      generationMode === "talkingPoints" ? "is-on" : ""
-                    }`}
-                    onClick={() => {
-                      setGenerationMode((prev) =>
-                        prev === "skills" ? "talkingPoints" : "skills",
-                      );
-                      setBullets([]);
-                      setErrorMsg(null);
-                    }}
-                  >
-                    <span className="generation-toggle-track">
-                      <span className="generation-toggle-thumb" />
-                    </span>
-                  </button>
-
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "talkingPoints" ? "active" : ""
-                    }`}
-                  >
-                    Talking Points
-                  </span>
-                </div>
+                <Link to="/resume" className="dash-resume-link">
+                  <i className="bi bi-file-earmark-text" aria-hidden="true" /> Writing
+                  resume bullet points? Open the Resume Builder
+                </Link>
               </div>
 
               <button
@@ -670,9 +635,7 @@ const StudentDashboard: React.FC = () => {
               >
                 {isLoading
                   ? "Generating..."
-                  : generationMode === "skills"
-                    ? "Generate Skills with AI"
-                    : "Generate Talking Points with AI"}
+                  : "Generate Talking Points with AI"}
               </button>
             </div>
           </div>
@@ -682,9 +645,7 @@ const StudentDashboard: React.FC = () => {
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">
-                {generationMode === "skills"
-                  ? "Generated Bullet Points:"
-                  : "Generated Talking Points:"}
+                {"Generated Talking Points:"}
               </h2>
 
               <div
@@ -732,9 +693,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="loading-container">
                   <div className="spinner"></div>
                   <p>
-                    {generationMode === "skills"
-                      ? "Generating bullet points with AI..."
-                      : "Generating talking points with AI..."}
+                    {"Generating talking points with AI..."}
                   </p>
                 </div>
               ) : errorMsg ? (

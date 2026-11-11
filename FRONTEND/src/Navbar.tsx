@@ -13,6 +13,7 @@ const STRIP_PATHS = ["/studentdashboard", "/history"];
 const STUDENT_LINKS = [
   { path: "/skill-assessment", label: "Skill Assessment" },
   { path: "/roadmap", label: "Roadmap" },
+  { path: "/resume", label: "Resume" },
   { path: "/skill-reviews", label: "Advisor Feedback" },
   { path: "/history", label: "History" },
 ];

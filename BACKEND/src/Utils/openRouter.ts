@@ -1,4 +1,5 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { redactSensitive } from "./aiSafety.js";
 
 // Server-side OpenRouter gateway with the same model cascade as the resume
 // generator (VITE_MODEL_ID_1 -> 2 -> 3). Returns null when every model
@@ -25,15 +26,33 @@ function logAiUsage(row: {
     });
 }
 
+// The exact request body sent to OpenRouter: the model, one user message
+// and an optional reply cap. The prompt is scrubbed of grades and personal
+// identifiers here, so no caller can send them by mistake (REQ-RES-8).
+export function buildOpenRouterBody(model: string, prompt: string, maxTokens?: number) {
+  return {
+    model,
+    messages: [{ role: "user", content: redactSensitive(prompt) }],
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+  };
+}
+
 export async function completeWithFallback(
   prompt: string,
   {
     feature,
     timeoutMs = 15000,
+    totalTimeoutMs,
+    maxTokens,
     validate,
   }: {
     feature: LogFeature;
+    // per model
     timeoutMs?: number;
+    // across the whole cascade; no new model is tried once it runs out
+    totalTimeoutMs?: number;
+    // cap on the reply length, which also keeps responses fast
+    maxTokens?: number;
     // Throw to reject a response and move on to the next model.
     validate?: (text: string) => void;
   },
@@ -53,6 +72,9 @@ export async function completeWithFallback(
 
   const started = Date.now();
   for (const model of models) {
+    const left =
+      totalTimeoutMs == null ? timeoutMs : totalTimeoutMs - (Date.now() - started);
+    if (left < 500) break;
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -62,11 +84,8 @@ export async function completeWithFallback(
           "HTTP-Referer": "http://localhost:3000",
           "X-Title": "QU Career Services",
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: prompt }],
-        }),
-        signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify(buildOpenRouterBody(model, prompt, maxTokens)),
+        signal: AbortSignal.timeout(Math.min(timeoutMs, left)),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
