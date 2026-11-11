@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./footer";
 import { useCareerProgress } from "./context/careerProgress";
+import InternshipOpenings from "./components/InternshipOpenings";
+import OnetAttribution from "./components/OnetAttribution";
 import {
   CATEGORIES,
   CLASS_YEARS,
@@ -291,6 +293,9 @@ const RoadmapPage: React.FC = () => {
                               {ms.source === "AI" && (
                                 <span className="rm-badge rm-badge-ai">AI suggested</span>
                               )}
+                              {ms.source === "CAREER_DATA" && (
+                                <span className="rm-badge rm-badge-data">For your career goal</span>
+                              )}
                             </button>
                           </div>
                         );
@@ -302,6 +307,8 @@ const RoadmapPage: React.FC = () => {
             );
           })}
         </section>
+        {/* O*NET license: credit on any page that shows O*NET data */}
+        {milestones.some((m) => m.source === "CAREER_DATA") && <OnetAttribution />}
       </main>
 
       {/* Milestone detail panel */}
@@ -332,6 +339,17 @@ const RoadmapPage: React.FC = () => {
               </p>
             )}
 
+            {selected.source === "CAREER_DATA" && (
+              <div className="rm-data-note" role="note">
+                <p>
+                  <i className="bi bi-bank" /> From O*NET&reg; occupation data
+                  {selected.component ? ` for ${selected.component}` : ""}, matched to
+                  your career goal.
+                </p>
+                <OnetAttribution compact />
+              </div>
+            )}
+
             {selected.resources.length > 0 && (
               <>
                 <h3 className="rm-panel-sub">Ways to complete</h3>
@@ -345,10 +363,14 @@ const RoadmapPage: React.FC = () => {
               </>
             )}
 
+            {selected.category === "EXPERIENCE" && selected.status !== "COMPLETE" && (
+              <InternshipOpenings />
+            )}
+
             <dl className="rm-panel-facts">
               {selected.component && (
                 <>
-                  <dt>Area</dt>
+                  <dt>{selected.source === "CAREER_DATA" ? "Occupation" : "Area"}</dt>
                   <dd>{selected.component}</dd>
                 </>
               )}
