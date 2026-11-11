@@ -62,10 +62,22 @@ const InternshipOpenings: React.FC = () => {
                   {l.title} <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
                 </a>
                 <span className="rm-openings-meta">
-                  {[l.company, l.location, posted(l.postedAt), l.source]
+                  {[l.company, l.location, posted(l.postedAt), l.source === "Adzuna" ? "" : l.source]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
+                {/* Adzuna API terms: label each listing "Adzuna" (at least
+                    116 x 23 px), linked to Adzuna's site */}
+                {l.source === "Adzuna" && (
+                  <a
+                    className="rm-adzuna-label"
+                    href="https://www.adzuna.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Jobs by Adzuna
+                  </a>
+                )}
               </li>
             ))}
           </ul>

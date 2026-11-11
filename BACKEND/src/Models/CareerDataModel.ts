@@ -120,18 +120,23 @@ export function parseTechnologySkills(data: any, max = 12): CareerSkill[] {
 
 // CareerOneStop certifications. Prefer real certifications over
 // certificates and licenses, then keep CareerOneStop's relevance order.
+// The CareerOneStop license forbids modifying its data, so values are kept
+// as sent (only surrounding whitespace trimmed); a name too long for the
+// milestone column is skipped rather than cut.
+const asSent = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
 export function parseCertifications(data: any, max = 6): CareerCert[] {
   const list = ((data?.CertList ?? []) as any[]).map((c, i) => ({
     cert: {
-      name: text(c?.Name, 150),
-      organization: text(c?.Organization, 150),
+      name: asSent(c?.Name),
+      organization: asSent(c?.Organization),
       url: httpsUrl(c?.Url) ?? httpsUrl(c?.OrganizationUrl),
-      description: text(c?.Description, 300),
+      description: asSent(c?.Description),
     },
     rank: (/certification/i.test(String(c?.Type ?? "")) ? 0 : 1000) + i,
   }));
   return list
-    .filter((x) => x.cert.name)
+    .filter((x) => x.cert.name && x.cert.name.length <= 150)
     .sort((a, b) => a.rank - b.rank)
     .slice(0, max)
     .map((x) => x.cert);
