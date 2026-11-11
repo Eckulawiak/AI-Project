@@ -6,7 +6,6 @@ import "./studentDashboard.css";
 import Navbar from "./Navbar";
 import { apiClient } from "./services/apiClient";
 import { useSchools } from "./hooks/useSchools";
-import ResumeProjects from "./components/ResumeProjects";
 import CareerGoalsInput from "./components/CareerGoalsInput";
 import {
   generateResumeContent,
@@ -39,9 +38,6 @@ const StudentDashboard: React.FC = () => {
   const [bullets, setBullets] = useState<string[]>([]);
   // which course or project each header in the AI output belongs to
   const [sections, setSections] = useState<ResumeSection[]>([]);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(
-    new Set(),
-  );
   const [careerGoals, setCareerGoals] = useState<string[]>([""]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -197,31 +193,9 @@ const StudentDashboard: React.FC = () => {
     (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
   ).length;
 
-  const toggleProject = (id: number) => {
-    setSelectedProjectIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setBullets([]);
-  };
-
-  const removeProjectFromSelection = (id: number) => {
-    setSelectedProjectIds((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    setBullets([]);
-  };
-
-  const generateWithAI = async (
-    courseIds: number[],
-    projectIds: number[],
-    mode: GenerationMode,
-  ) => {
+  // Projects are picked on the Resume page; talking points here come from
+  // classes only.
+  const generateWithAI = async (courseIds: number[], mode: GenerationMode) => {
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -229,7 +203,7 @@ const StudentDashboard: React.FC = () => {
       const result = await generateResumeContent({
         mode,
         courseIds,
-        projectIds,
+        projectIds: [],
         careerGoals: careerGoals.map((g) => g.trim()).filter(Boolean),
       });
 
@@ -262,22 +236,17 @@ const StudentDashboard: React.FC = () => {
     const courseIds = availableClasses
       .map((course) => Number(getResolvedId(course)))
       .filter((id) => Number.isInteger(id) && id > 0);
-    const projectIds = [...selectedProjectIds];
 
-    if (courseIds.length === 0 && projectIds.length === 0) {
-      if (availableClasses.length === 0) {
-        setBullets([
-          `No classes are listed for ${major} yet. Add a project to generate.`,
-        ]);
-        return;
-      }
+    if (courseIds.length === 0) {
       setBullets([
-        "Select at least one class or project to generate talking points.",
+        availableClasses.length === 0
+          ? `No classes are listed for ${major} yet.`
+          : "Select at least one class to generate talking points.",
       ]);
       return;
     }
 
-    generateWithAI(courseIds, projectIds, generationMode);
+    generateWithAI(courseIds, generationMode);
   };
 
   const handleCopy = () => {
@@ -587,13 +556,6 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
 
-            <ResumeProjects
-              selectedIds={selectedProjectIds}
-              onToggle={toggleProject}
-              onAdded={(id) => toggleProject(id)}
-              onDeleted={removeProjectFromSelection}
-            />
-
             <CareerGoalsInput
               goals={careerGoals}
               onChange={(goals) => {
@@ -700,8 +662,8 @@ const StudentDashboard: React.FC = () => {
                 <p className="error-text">{errorMsg}</p>
               ) : bullets.length === 0 ? (
                 <p className="placeholder-text">
-                  Select classes or projects and click "Generate" to see your
-                  AI-generated content.
+                  Select classes and click "Generate" to see your AI-generated
+                  talking points.
                 </p>
               ) : (
                 <ul>
