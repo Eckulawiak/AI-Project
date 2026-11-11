@@ -19,7 +19,6 @@ import {
   searchOccupations,
   type CareerData,
 } from "./CareerDataModel.js";
-import { getRegistryCerts, registryCertSuggestions } from "./CredentialRegistryModel.js";
 import {
   CLASS_YEARS,
   classYearForCourse,
@@ -43,7 +42,7 @@ export type MilestoneSource =
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
   | "COURSE_SKILL" // a skill taught in a required course not yet completed
-  | "CAREER_DATA"; // skill from O*NET, certification from Credential Engine
+  | "CAREER_DATA"; // skill from O*NET
 
 export type StudentProfile = {
   firstName: string;
@@ -531,9 +530,9 @@ export async function buildRoadmap(
   // the major's courses already teach.
   //  1. O*NET finds occupations matching the goal; the AI picks the best
   //     one in the same call that suggests internships.
-  //  2. Skills come from that occupation's O*NET data, and certifications
-  //     from the Credential Engine Registry, when they can be looked up,
-  //     and from the AI otherwise.
+  //  2. Skills come from that occupation's O*NET data when it can be
+  //     looked up, and from the AI otherwise. Certifications come from
+  //     the AI.
   // null = that source was unavailable this time.
   const courseSkills = [...new Set(courses.flatMap((c) => c.skills))];
   const earliestYear = profile.classYear ?? "FIRST";
@@ -558,31 +557,18 @@ export async function buildRoadmap(
     : { items: [], occupationCode: null };
   const occupation =
     occupations.find((o) => o.code === ai?.occupationCode) ?? occupations[0] ?? null;
-  const [careerData, registryCerts] = occupation
-    ? await Promise.all([
-        getCareerData(occupation).catch((e): CareerData | null => {
-          console.error("Career data lookup failed:", e);
-          return null;
-        }),
-        getRegistryCerts(occupation).catch((e) => {
-          console.error("Certification lookup failed:", e);
-          return null;
-        }),
-      ])
-    : [null, null];
+  const careerData: CareerData | null = occupation
+    ? await getCareerData(occupation).catch((e) => {
+        console.error("Career data lookup failed:", e);
+        return null;
+      })
+    : null;
 
-  const dataSkills = careerData
+  const dataItems = careerData
     ? careerDataSuggestions(careerData, { courseSkills, earliestYear })
     : [];
-  const dataCerts =
-    occupation && registryCerts
-      ? registryCertSuggestions(registryCerts, occupation, earliestYear)
-      : [];
-  const dataItems = [...dataSkills, ...dataCerts];
   const aiItems = (ai?.items ?? []).filter(
-    (s) =>
-      s.category === "EXPERIENCE" ||
-      (s.category === "SKILL" ? dataSkills.length === 0 : dataCerts.length === 0),
+    (s) => s.category !== "SKILL" || dataItems.length === 0,
   );
 
   const { data: roadmap, error: roadmapError } = await supabase
@@ -609,7 +595,7 @@ export async function buildRoadmap(
   if (!fresh) {
     const keep = [
       ...(ai === null ? ["AI"] : []),
-      ...(goal && !careerData && dataCerts.length === 0 ? ["CAREER_DATA"] : []),
+      ...(goal && !careerData ? ["CAREER_DATA"] : []),
     ];
     if (keep.length) toDelete = toDelete.not("source", "in", `(${keep.join(",")})`);
   }
@@ -748,8 +734,8 @@ export async function buildRoadmap(
     });
   }
 
-  // O*NET skills and Credential Engine certifications, optional like the
-  // AI ones. component holds the occupation they come from.
+  // O*NET skills, optional like the AI ones. component holds the
+  // occupation they come from.
   for (const s of dataItems) {
     add({
       template_milestone_id: null,
@@ -760,7 +746,7 @@ export async function buildRoadmap(
       description: s.description,
       source: "CAREER_DATA",
       competency_ids: [],
-      component: occupation!.title.slice(0, 60),
+      component: careerData!.occupation.title.slice(0, 60),
       resources: s.resources,
       required: false,
       status: "PENDING",
