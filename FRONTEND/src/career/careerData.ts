@@ -158,7 +158,7 @@ export interface InternshipListing {
   company: string;
   location: string;
   url: string;
-  source: string; // Adzuna or USAJobs
+  source: string; // Jooble or USAJobs
   postedAt: string | null;
 }
 
