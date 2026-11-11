@@ -6,6 +6,12 @@ import { loadSession } from "./Session";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+// The History API needs the student's login token.
+const authHeaders = (): Record<string, string> => {
+  const token = loadSession()?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 type HistoryItem = {
   id: number;
   Date: string;
@@ -64,6 +70,7 @@ const HistoryPage: React.FC = () => {
 
         const response = await fetch(
           `${API_BASE_URL}/api/history/student/${studentId}`,
+          { headers: authHeaders() },
         );
 
         if (!response.ok) {
@@ -134,6 +141,7 @@ const HistoryPage: React.FC = () => {
           `${API_BASE_URL}/api/history/student/${studentId}/entry/${item.id}`,
           {
             method: "DELETE",
+            headers: authHeaders(),
           },
         );
 
@@ -171,6 +179,7 @@ const HistoryPage: React.FC = () => {
         `${API_BASE_URL}/api/history/student/${studentId}`,
         {
           method: "DELETE",
+          headers: authHeaders(),
         },
       );
 

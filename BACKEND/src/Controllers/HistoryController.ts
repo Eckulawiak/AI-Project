@@ -1,3 +1,6 @@
+// Saved talking points ("History"). Mounted behind RequireStudent: the
+// student always comes from the login token, so students can only save,
+// read and delete their own history.
 import { type Request, type Response } from "express";
 import {
   saveTalkingPointsForStudent,
@@ -6,18 +9,31 @@ import {
   deleteAllHistoryForStudent,
 } from "../Models/HistoryModel.js";
 
+// The :studentId in the URL must be the signed-in student. Returns their
+// id, or sends the error and returns null.
+function ownStudentId(req: Request, res: Response): number | null {
+  const studentId = Number(req.params.studentId);
+  if (!Number.isInteger(studentId) || studentId <= 0) {
+    res.status(400).json({ error: "Invalid studentId" });
+    return null;
+  }
+  if (studentId !== req.user!.userId) {
+    res.status(403).json({ error: "You can only access your own history" });
+    return null;
+  }
+  return studentId;
+}
+
 export const saveHistory = async (req: Request, res: Response) => {
   try {
-    const studentId = Number(req.body.studentId);
+    // always the signed-in student; any studentId in the body is ignored
+    const studentId = req.user!.userId;
     const courseName = String(req.body.courseName ?? "").trim();
     const courseCode = String(req.body.courseCode ?? "").trim();
     const talkingPoints = Array.isArray(req.body.talkingPoints)
       ? req.body.talkingPoints
       : [];
 
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return res.status(400).json({ error: "Valid studentId is required" });
-    }
     if (!courseName) {
       return res.status(400).json({ error: "courseName is required" });
     }
@@ -42,10 +58,8 @@ export const saveHistory = async (req: Request, res: Response) => {
 
 export const getStudentHistory = async (req: Request, res: Response) => {
   try {
-    const studentId = Number(req.params.studentId);
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return res.status(400).json({ error: "Invalid studentId" });
-    }
+    const studentId = ownStudentId(req, res);
+    if (studentId === null) return;
 
     const history = await getHistoryForStudent(studentId);
     res.json(history);
@@ -57,12 +71,10 @@ export const getStudentHistory = async (req: Request, res: Response) => {
 
 export const deleteHistory = async (req: Request, res: Response) => {
   try {
-    const studentId = Number(req.params.studentId);
+    const studentId = ownStudentId(req, res);
+    if (studentId === null) return;
     const historyId = Number(req.params.historyId);
 
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return res.status(400).json({ error: "Invalid studentId" });
-    }
     if (!Number.isInteger(historyId) || historyId <= 0) {
       return res.status(400).json({ error: "Invalid historyId" });
     }
@@ -80,11 +92,8 @@ export const deleteHistory = async (req: Request, res: Response) => {
 
 export const clearAllHistory = async (req: Request, res: Response) => {
   try {
-    const studentId = Number(req.params.studentId);
-
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return res.status(400).json({ error: "Invalid studentId" });
-    }
+    const studentId = ownStudentId(req, res);
+    if (studentId === null) return;
 
     const result = await deleteAllHistoryForStudent(studentId);
     res.json(result);
