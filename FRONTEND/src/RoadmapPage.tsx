@@ -292,6 +292,9 @@ const RoadmapPage: React.FC = () => {
                               {ms.source === "AI" && (
                                 <span className="rm-badge rm-badge-ai">AI suggested</span>
                               )}
+                              {ms.source === "CAREER_DATA" && (
+                                <span className="rm-badge rm-badge-data">For your career goal</span>
+                              )}
                             </button>
                           </div>
                         );
@@ -333,6 +336,15 @@ const RoadmapPage: React.FC = () => {
               </p>
             )}
 
+            {selected.source === "CAREER_DATA" && (
+              <p className="rm-data-note" role="note">
+                <i className="bi bi-bank" /> From U.S. Department of Labor data
+                {selected.component ? ` for ${selected.component}` : ""} (
+                {selected.category === "CERT" ? "CareerOneStop" : "O*NET"}), matched to
+                your career goal.
+              </p>
+            )}
+
             {selected.resources.length > 0 && (
               <>
                 <h3 className="rm-panel-sub">Ways to complete</h3>
@@ -353,7 +365,7 @@ const RoadmapPage: React.FC = () => {
             <dl className="rm-panel-facts">
               {selected.component && (
                 <>
-                  <dt>Area</dt>
+                  <dt>{selected.source === "CAREER_DATA" ? "Occupation" : "Area"}</dt>
                   <dd>{selected.component}</dd>
                 </>
               )}

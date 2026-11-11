@@ -12,7 +12,14 @@ import {
   normalizeSkill,
   skillWays,
   suggestForCareerGoal,
+  type AiSuggestion,
 } from "./AiSuggestionsModel.js";
+import {
+  careerDataSuggestions,
+  getCareerData,
+  searchOccupations,
+  type CareerData,
+} from "./CareerDataModel.js";
 import {
   CLASS_YEARS,
   classYearForCourse,
@@ -35,7 +42,8 @@ export type MilestoneSource =
   | "EXPERIENCE"
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
-  | "COURSE_SKILL"; // a skill taught in a required course not yet completed
+  | "COURSE_SKILL" // a skill taught in a required course not yet completed
+  | "CAREER_DATA"; // skill or certification from O*NET / CareerOneStop
 
 export type StudentProfile = {
   firstName: string;
@@ -519,20 +527,52 @@ export async function buildRoadmap(
       : [];
   const history = await getCourseHistory(studentId);
 
-  // AI suggestions from the career goal only. They must not repeat any
-  // skill the major's courses already teach. null = AI unavailable.
+  // Suggestions from the career goal only. They must not repeat any skill
+  // the major's courses already teach.
+  //  1. O*NET finds occupations matching the goal; the AI picks the best
+  //     one in the same call that suggests internships.
+  //  2. Skills and certifications come from that occupation's Department
+  //     of Labor data (O*NET, CareerOneStop) when it can be looked up, and
+  //     from the AI otherwise.
+  // null = that source was unavailable this time.
   const courseSkills = [...new Set(courses.flatMap((c) => c.skills))];
-  const ai = profile.careerGoal?.trim()
+  const earliestYear = profile.classYear ?? "FIRST";
+  const goal = profile.careerGoal?.trim() ?? "";
+  const occupations = goal
+    ? await searchOccupations(goal).catch((e) => {
+        console.error("Occupation search failed:", e);
+        return [];
+      })
+    : [];
+  const ai = goal
     ? await suggestForCareerGoal({
-        careerGoal: profile.careerGoal,
+        careerGoal: goal,
         goalType: profile.goalType,
         courseSkills,
-        earliestYear: profile.classYear ?? "FIRST",
+        earliestYear,
+        occupations,
       }).catch((e) => {
         console.error("AI roadmap suggestions failed:", e);
         return null;
       })
-    : [];
+    : { items: [], occupationCode: null };
+  const occupation =
+    occupations.find((o) => o.code === ai?.occupationCode) ?? occupations[0] ?? null;
+  const careerData: CareerData | null = occupation
+    ? await getCareerData(occupation).catch((e) => {
+        console.error("Career data lookup failed:", e);
+        return null;
+      })
+    : null;
+
+  const fromData = careerData
+    ? careerDataSuggestions(careerData, { courseSkills, earliestYear })
+    : { skills: [], certifications: [] };
+  const useAi = (category: AiSuggestion["category"]) =>
+    category === "EXPERIENCE" ||
+    (category === "SKILL" ? fromData.skills.length === 0 : fromData.certifications.length === 0);
+  const aiItems = (ai?.items ?? []).filter((s) => useAi(s.category));
+  const dataItems = [...fromData.skills, ...fromData.certifications];
 
   const { data: roadmap, error: roadmapError } = await supabase
     .from("student_roadmaps")
@@ -554,8 +594,14 @@ export async function buildRoadmap(
     .delete()
     .eq("roadmap_id", roadmap.id);
   if (!fresh) toDelete = toDelete.eq("status", "PENDING");
-  // If the AI is down, keep the suggestions it made last time (REQ-PERF-6).
-  if (!fresh && ai === null) toDelete = toDelete.neq("source", "AI");
+  // If a source is down, keep what it suggested last time (REQ-PERF-6).
+  if (!fresh) {
+    const keep = [
+      ...(ai === null ? ["AI"] : []),
+      ...(goal && !careerData ? ["CAREER_DATA"] : []),
+    ];
+    if (keep.length) toDelete = toDelete.not("source", "in", `(${keep.join(",")})`);
+  }
   const { error: deleteError } = await toDelete;
   if (deleteError) throw new Error(deleteError.message);
 
@@ -673,7 +719,7 @@ export async function buildRoadmap(
   // changes, so they never hold back progress, and the student should review
   // them (REQ-SAFE-1). Internships are required, as in the career
   // development frameworks.
-  for (const s of ai ?? []) {
+  for (const s of aiItems) {
     add({
       template_milestone_id: null,
       course_id: null,
@@ -686,6 +732,26 @@ export async function buildRoadmap(
       component: null,
       resources: s.resources,
       required: s.category === "EXPERIENCE",
+      status: "PENDING",
+      completed_at: null,
+    });
+  }
+
+  // Department of Labor skills and certifications, optional like the AI
+  // ones. component holds the occupation they come from.
+  for (const s of dataItems) {
+    add({
+      template_milestone_id: null,
+      course_id: null,
+      category: s.category,
+      class_year: s.classYear,
+      name: s.name.slice(0, 150),
+      description: s.description,
+      source: "CAREER_DATA",
+      competency_ids: [],
+      component: careerData!.occupation.title.slice(0, 60),
+      resources: s.resources,
+      required: false,
       status: "PENDING",
       completed_at: null,
     });

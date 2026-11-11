@@ -355,6 +355,21 @@
   color: #4b2f8f;
 }
 
+.rm-badge-data {
+  background: #e3f3ec;
+  color: #1d5c42;
+}
+
+.rm-data-note {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  background: #eef8f3;
+  color: #1d5c42;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin: 0 0 1rem;
+}
+
 .rm-ai-note {
   font-size: 0.85rem;
   line-height: 1.45;

@@ -116,7 +116,14 @@ function buildPrompt(
   careerGoal: string,
   goalType: "INDUSTRY" | "GRAD" | null,
   courseSkills: string[],
+  occupations: Array<{ code: string; title: string }>,
 ) {
+  const occupationPart = occupations.length
+    ? `
+
+Also pick the occupation from this U.S. Department of Labor (O*NET) list that best fits the goal, and return its code as "occupation":
+${occupations.map((o) => `- ${o.code}: ${o.title}`).join("\n")}`
+    : "";
   const path =
     goalType === "GRAD" ? "going to graduate school for" : "working in industry as/in";
   return `You are a university career advisor. A student's career goal is ${path}: "${careerGoal}".
@@ -129,11 +136,13 @@ Suggest what the student should do outside of class to reach this goal:
 - "certifications": up to ${MAX.CERT} real, widely recognized certifications for this career. Only include a certification if it actually exists. "issuer" is the name of the organization that awards it.
 - "internships": up to ${MAX.EXPERIENCE} kinds of internships or experiences that build toward this career. "search" is a short job-board search phrase for finding them.
 
+${occupationPart}
+
 For each item, "year" is when an undergraduate should do it: FIRST, SOPH, JUNIOR or SENIOR.
 Keep names under 80 characters and descriptions to one plain sentence. Do not include any links or URLs. Do not promise jobs, admission or any outcome.
 
 Return ONLY JSON in exactly this shape, with no markdown and no other text:
-{"skills":[{"name":"","description":"","year":"JUNIOR"}],"certifications":[{"name":"","description":"","year":"SENIOR","issuer":""}],"internships":[{"name":"","description":"","year":"JUNIOR","search":""}]}`;
+{${occupations.length ? '"occupation":"00-0000.00",' : ""}"skills":[{"name":"","description":"","year":"JUNIOR"}],"certifications":[{"name":"","description":"","year":"SENIOR","issuer":""}],"internships":[{"name":"","description":"","year":"JUNIOR","search":""}]}`;
 }
 
 function extractJson(text: string): any {
@@ -215,6 +224,19 @@ export function parseSuggestions(
   return out;
 }
 
+// The occupation code the model picked, if it is one of the candidates.
+export function parseOccupationChoice(
+  text: string,
+  occupations: Array<{ code: string }>,
+): string | null {
+  try {
+    const code = String(extractJson(text)?.occupation ?? "").trim();
+    return occupations.some((o) => o.code === code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 // null when AI is unavailable or every model returned something unusable,
 // so the caller can keep what the roadmap already has (REQ-PERF-6).
 export async function suggestForCareerGoal(input: {
@@ -222,13 +244,15 @@ export async function suggestForCareerGoal(input: {
   goalType: "INDUSTRY" | "GRAD" | null;
   courseSkills: string[];
   earliestYear: ClassYear;
-}): Promise<AiSuggestion[] | null> {
+  occupations?: Array<{ code: string; title: string }>;
+}): Promise<{ items: AiSuggestion[]; occupationCode: string | null } | null> {
   const goal = input.careerGoal.trim().slice(0, 200);
-  if (!goal) return [];
+  if (!goal) return { items: [], occupationCode: null };
+  const occupations = input.occupations ?? [];
 
   let parsed: AiSuggestion[] = [];
   const text = await completeWithFallback(
-    buildPrompt(goal, input.goalType, input.courseSkills),
+    buildPrompt(goal, input.goalType, input.courseSkills, occupations),
     {
       feature: "SKILL_SUGGEST",
       validate: (t) => {
@@ -237,5 +261,6 @@ export async function suggestForCareerGoal(input: {
       },
     },
   );
-  return text ? parsed : null;
+  if (!text) return null;
+  return { items: parsed, occupationCode: parseOccupationChoice(text, occupations) };
 }
