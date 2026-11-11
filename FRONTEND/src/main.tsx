@@ -138,7 +138,14 @@ createRoot(document.getElementById("root")!).render(
           }
         />
 
-        <Route path="/audit-logs" element={<AuditLogsPage />} />
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute allowedTypes={["Administrator"]}>
+              <AuditLogsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
