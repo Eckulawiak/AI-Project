@@ -87,7 +87,9 @@ export function skillWays(skill: string) {
 export function certWays(cert: string, issuer?: string | null) {
   return [
     ...(issuer ? [`Awarded by ${issuer}`] : []),
-    `Find the official exam and study guide: https://www.google.com/search?q=${q(`${cert} certification official`)}`,
+    `Find the official exam and study guide: https://www.google.com/search?q=${q(
+      `${cert} ${issuer ?? ""} ${/certif/i.test(cert) ? "" : "certification"} official`.replace(/\s+/g, " "),
+    )}`,
     "Ask Career Development whether QU offers vouchers or prep sessions",
   ];
 }
