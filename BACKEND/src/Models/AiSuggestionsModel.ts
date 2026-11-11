@@ -49,17 +49,6 @@ export function overlapsCourseSkill(name: string, courseSkills: string[]) {
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const q = (s: string) => encodeURIComponent(s.trim());
 
-// Only well-formed https links are shown to students.
-function safeUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  try {
-    const u = new URL(value.trim());
-    return u.protocol === "https:" ? u.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
 const clean = (v: unknown, max: number) =>
   typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "";
 
@@ -85,12 +74,11 @@ export function skillWays(skill: string) {
   ];
 }
 
-export function certWays(cert: string, officialUrl?: string | null) {
+// The AI never writes links (it can't browse, so they may be wrong); the
+// search link is built here from the certification and issuer names.
+export function certWays(cert: string, issuer?: string | null) {
   return [
-    // The link comes from the AI, so it is labelled as a suggestion.
-    ...(officialUrl
-      ? [`Certification site suggested by AI (check it's the official one): ${officialUrl}`]
-      : []),
+    ...(issuer ? [`Awarded by ${issuer}`] : []),
     `Find the official exam and study guide: https://www.google.com/search?q=${q(`${cert} certification official`)}`,
     "Ask Career Development whether QU offers vouchers or prep sessions",
   ];
@@ -130,14 +118,14 @@ ${courseSkills.length ? courseSkills.map((s) => `- ${s}`).join("\n") : "- (none 
 
 Suggest what the student should do outside of class to reach this goal:
 - "skills": up to ${MAX.SKILL} specific, job-relevant skills for this career that are NOT in the list above.
-- "certifications": up to ${MAX.CERT} real, widely recognized certifications for this career. Only include a certification if it actually exists. "url" must be the official certification page of the organization that awards it.
+- "certifications": up to ${MAX.CERT} real, widely recognized certifications for this career. Only include a certification if it actually exists. "issuer" is the name of the organization that awards it.
 - "internships": up to ${MAX.EXPERIENCE} kinds of internships or experiences that build toward this career. "search" is a short job-board search phrase for finding them.
 
 For each item, "year" is when an undergraduate should do it: FIRST, SOPH, JUNIOR or SENIOR.
-Keep names under 80 characters and descriptions to one plain sentence. Do not promise jobs, admission or any outcome.
+Keep names under 80 characters and descriptions to one plain sentence. Do not include any links or URLs. Do not promise jobs, admission or any outcome.
 
 Return ONLY JSON in exactly this shape, with no markdown and no other text:
-{"skills":[{"name":"","description":"","year":"JUNIOR"}],"certifications":[{"name":"","description":"","year":"SENIOR","url":"https://"}],"internships":[{"name":"","description":"","year":"JUNIOR","search":""}]}`;
+{"skills":[{"name":"","description":"","year":"JUNIOR"}],"certifications":[{"name":"","description":"","year":"SENIOR","issuer":""}],"internships":[{"name":"","description":"","year":"JUNIOR","search":""}]}`;
 }
 
 function extractJson(text: string): any {
@@ -199,7 +187,7 @@ export function parseSuggestions(
       name,
       description: clean(c?.description, 400),
       classYear: year(c?.year),
-      resources: certWays(name, safeUrl(c?.url)),
+      resources: certWays(name, clean(c?.issuer, 80) || null),
     });
   }
 
