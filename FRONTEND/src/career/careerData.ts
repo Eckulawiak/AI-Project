@@ -13,7 +13,8 @@ export type MilestoneSource =
   | "EXPERIENCE"
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
-  | "COURSE_SKILL"; // skill from a required course not completed yet
+  | "COURSE_SKILL" // skill from a required course not completed yet
+  | "CAREER_DATA"; // skill or certification from O*NET / CareerOneStop
 export type CourseStatus = "NONE" | "IN_PROGRESS" | "COMPLETED";
 
 export const CATEGORIES: { id: Category; label: string; icon: string }[] = [
@@ -150,4 +151,20 @@ export interface AssessmentSubmission {
   courses: { courseId: number; status: CourseStatus }[];
   ratings: Record<string, number>;
   experience: ExperienceEntry[];
+}
+
+export interface InternshipListing {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source: string; // Adzuna, USAJobs or The Muse
+  postedAt: string | null;
+}
+
+export interface InternshipListings {
+  goal: string;
+  listings: InternshipListing[];
+  sources: string[];
+  fetchedAt: string;
 }

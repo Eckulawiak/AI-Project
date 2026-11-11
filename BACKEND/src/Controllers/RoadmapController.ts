@@ -5,7 +5,9 @@ import {
   getProgressForStudent,
   getRoadmapPayload,
   setMilestoneStatus,
+  getStudentProfile,
 } from "../Models/RoadmapModel.js";
+import { getInternshipListings } from "../Models/InternshipListingsModel.js";
 
 const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : "Unknown error";
@@ -58,6 +60,19 @@ export const updateMilestone = async (
 export const getMilestoneProgress = async (req: Request, res: Response) => {
   try {
     res.json(await getProgressForStudent(req.user!.userId));
+  } catch (e: unknown) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+};
+
+// GET /api/roadmap/internships -> current openings for the career goal
+export const getInternships = async (req: Request, res: Response) => {
+  try {
+    const profile = await getStudentProfile(req.user!.userId);
+    if (!profile.careerGoal?.trim()) {
+      return res.json({ goal: "", listings: [], sources: [], fetchedAt: new Date().toISOString() });
+    }
+    res.json(await getInternshipListings(profile.careerGoal));
   } catch (e: unknown) {
     res.status(500).json({ error: errorMessage(e) });
   }
