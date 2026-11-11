@@ -257,6 +257,8 @@ export async function suggestForCareerGoal(input: {
     buildPrompt(goal, input.goalType, input.courseSkills, occupations),
     {
       feature: "SKILL_SUGGEST",
+      // The free models are slow and this answer is long JSON.
+      timeoutMs: 40000,
       validate: (t) => {
         parsed = parseSuggestions(t, input);
         if (parsed.length === 0) throw new Error("No usable suggestions");
