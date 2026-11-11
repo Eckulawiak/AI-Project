@@ -9,7 +9,8 @@ import { findSensitive } from "../Utils/aiSafety.js";
 process.env.SUPABASE_URL ??= "http://supabase.test";
 process.env.SUPABASE_API_KEY ??= "test-key";
 
-const { buildBlockPrompt, parseBullets } = await import("./ResumeBlocksModel.js");
+const ResumeBlocks = await import("./ResumeBlocksModel.js");
+const { buildBlockPrompt, parseBullets } = ResumeBlocks;
 const { buildOpenRouterBody } = await import("../Utils/openRouter.js");
 
 const input = {
@@ -81,4 +82,30 @@ test("bullets with other markers, or none, are still read", () => {
     "Built REST endpoints in Express",
     "Tested every API route",
   ]);
+});
+
+test("a reply for several sections is split by its headers", () => {
+  const { splitSections } = ResumeBlocks;
+  const reply = `Here you go!
+
+**SER 491:**
+- Developed REST APIs in an Agile team of five
+- Delivered sprint demos to faculty stakeholders
+
+Budget App:
+• Built a budgeting app for students in React
+• Stored user data securely with Supabase
+
+Hope this helps!`;
+  const found = splitSections(reply, ["SER 491", "Budget App", "SER 340"]);
+  assert.deepEqual(found.get("SER 491"), [
+    "Developed REST APIs in an Agile team of five",
+    "Delivered sprint demos to faculty stakeholders",
+  ]);
+  assert.deepEqual(found.get("Budget App"), [
+    "Built a budgeting app for students in React",
+    "Stored user data securely with Supabase",
+  ]);
+  // a section the reply skipped is missing, so the page offers a Retry
+  assert.equal(found.has("SER 340"), false);
 });

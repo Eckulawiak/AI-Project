@@ -1,9 +1,10 @@
 // Resume bullet points as one block per course or project (REQ-RES-2,
-// REQ-RES-5). Each block is its own small AI request, so the blocks are
-// generated in parallel and "Regenerate" on one block re-sends only that
-// course or project.
+// REQ-RES-5). New blocks are written in one AI request and split by their
+// headers; "Regenerate" on one block re-sends only that course or project.
+// One request at a time keeps free models under their rate limits.
 import { completeWithFallback } from "../Utils/openRouter.js";
 import {
+  buildResumePrompt,
   loadResumeInput,
   type ResumeInput,
   type ResumeRequest,
@@ -24,7 +25,7 @@ export type ResumeBlock = {
 // a cap on reasoning and return nothing.
 const MODEL_TIMEOUT_MS = 15000;
 const TOTAL_TIMEOUT_MS = 30000;
-const PARALLEL = 4;
+const FAILED = "Couldn't generate bullet points. Try again.";
 
 export const blockKey = (kind: "course" | "project", id: number) => `${kind}:${id}`;
 
@@ -93,7 +94,7 @@ const tidy = (line: string) =>
 // Lines that are chatter or headings rather than bullet points.
 const isChatter = (line: string) =>
   line.endsWith(":") ||
-  /^(here (are|is)|sure|certainly|these bullet|bullet points?\b|note:|i hope|let me know)/i.test(
+  /^(here (are|is)|sure|certainly|these bullet|bullet points?\b|note:|i hope|hope this|let me know)/i.test(
     line,
   );
 
@@ -114,45 +115,87 @@ export function parseBullets(text: string): string[] {
   return picked.filter((line) => line.length >= 12 && !isChatter(line)).slice(0, 5);
 }
 
-async function generateOne(input: ResumeInput, section: ResumeSection): Promise<ResumeBlock> {
-  const block = {
-    key: blockKey(section.kind, section.kind === "course" ? section.courseId : section.projectId),
-    kind: section.kind,
-    refId: section.kind === "course" ? section.courseId : section.projectId,
-    heading: headingFor(section),
-  };
+const header = (line: string) =>
+  line
+    .replace(/^#+\s*/, "")
+    .replace(/\*\*|__/g, "")
+    .replace(/^(course|project)\s*:\s*/i, "")
+    .replace(/:\s*$/, "")
+    .trim()
+    .toLowerCase();
 
-  let bullets: string[] = [];
-  const text = await completeWithFallback(buildBlockPrompt(input, section), {
+// Split a reply for several sections by their header lines ("SER 491:")
+// into bullets per section label. Labels the reply skipped are missing.
+export function splitSections(text: string, labels: string[]): Map<string, string[]> {
+  const wanted = new Map(labels.map((l) => [l.toLowerCase(), l]));
+  const chunks = new Map<string, string[]>();
+  let current: string | null = null;
+
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const match = wanted.get(header(line));
+    if (match && (line.endsWith(":") || line.length <= match.length + 6)) {
+      current = match;
+      if (!chunks.has(current)) chunks.set(current, []);
+      continue;
+    }
+    if (current) chunks.get(current)!.push(line);
+  }
+
+  const out = new Map<string, string[]>();
+  for (const [label, lines] of chunks) {
+    const bullets = parseBullets(lines.join("\n"));
+    if (bullets.length > 0) out.set(label, bullets);
+  }
+  return out;
+}
+
+const blockFor = (section: ResumeSection) => ({
+  key: blockKey(section.kind, section.kind === "course" ? section.courseId : section.projectId),
+  kind: section.kind,
+  refId: section.kind === "course" ? section.courseId : section.projectId,
+  heading: headingFor(section),
+});
+
+const ai = (prompt: string, validate: (reply: string) => void) =>
+  completeWithFallback(prompt, {
     feature: "RESUME",
     timeoutMs: MODEL_TIMEOUT_MS,
     totalTimeoutMs: TOTAL_TIMEOUT_MS,
-    validate: (reply) => {
-      bullets = parseBullets(reply);
-      if (bullets.length === 0) throw new Error("No bullet points in the reply");
-    },
+    validate,
   });
 
+// One section: its own small prompt (REQ-RES-5 regenerate).
+async function generateOne(input: ResumeInput, section: ResumeSection): Promise<ResumeBlock> {
+  const block = blockFor(section);
+  let bullets: string[] = [];
+  const text = await ai(buildBlockPrompt(input, section), (reply) => {
+    bullets = parseBullets(reply);
+    if (bullets.length === 0) throw new Error("No bullet points in the reply");
+  });
   if (text == null) {
     // why each model failed is logged by completeWithFallback
     console.warn(`No resume bullets for ${block.key} (${block.heading}).`);
-    return { ...block, bullets: [], error: "Couldn't generate bullet points. Try again." };
+    return { ...block, bullets: [], error: FAILED };
   }
   return { ...block, bullets };
 }
 
-// Run fn over items, at most `limit` at a time, keeping the order.
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]!);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
+// Several sections: one prompt with a header per section, split afterwards.
+// A section the reply skipped comes back with an error and a Retry.
+async function generateMany(input: ResumeInput): Promise<ResumeBlock[]> {
+  const labels = input.sections.map((s) => s.label);
+  let found = new Map<string, string[]>();
+  const text = await ai(buildResumePrompt(input), (reply) => {
+    found = splitSections(reply, labels);
+    if (found.size === 0) throw new Error("No sections found in the reply");
+  });
+  if (text == null) console.warn(`No resume bullets for ${labels.join(", ")}.`);
+
+  return input.sections.map((section) => {
+    const bullets = found.get(section.label);
+    return bullets ? { ...blockFor(section), bullets } : { ...blockFor(section), bullets: [], error: FAILED };
+  });
 }
 
 // One block per course and project picked, in the order picked. A course
@@ -162,7 +205,12 @@ export async function generateBlocks(
   request: ResumeRequest,
 ): Promise<ResumeBlock[]> {
   const input = await loadResumeInput(studentId, request);
-  const blocks = await mapLimit(input.sections, PARALLEL, (s) => generateOne(input, s));
+  const blocks =
+    input.sections.length === 0
+      ? []
+      : input.sections.length === 1
+        ? [await generateOne(input, input.sections[0]!)]
+        : await generateMany(input);
 
   const generated = new Set(blocks.map((b) => b.key));
   const unmapped: ResumeBlock[] = request.courseIds
