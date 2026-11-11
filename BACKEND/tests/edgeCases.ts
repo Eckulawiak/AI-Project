@@ -25,7 +25,7 @@ import jwt from "jsonwebtoken";
 import { supabase } from "../src/Database/supabaseClient.js";
 import { signToken, type TokenPayload } from "../src/Utils/jwt.js";
 
-const BASE = (process.env.TEST_API_URL ?? `http://localhost:${process.env.PORT ?? 3000}`).replace(
+const BASE = (process.env.TEST_API_URL ?? `http://localhost:${process.env.PORT ?? 3001}`).replace(
   /\/$/,
   "",
 );
