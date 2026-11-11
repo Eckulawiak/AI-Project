@@ -14,7 +14,7 @@ export type MilestoneSource =
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
   | "COURSE_SKILL" // skill from a required course not completed yet
-  | "CAREER_DATA"; // skill or certification from O*NET / CareerOneStop
+  | "CAREER_DATA"; // skill from O*NET
 export type CourseStatus = "NONE" | "IN_PROGRESS" | "COMPLETED";
 
 export const CATEGORIES: { id: Category; label: string; icon: string }[] = [
@@ -158,7 +158,7 @@ export interface InternshipListing {
   company: string;
   location: string;
   url: string;
-  source: string; // Adzuna or USAJobs
+  source: string; // Jooble or USAJobs
   postedAt: string | null;
 }
 
