@@ -7,14 +7,13 @@ import { supabase } from "../Database/supabaseClient.js";
 // Providers (each is skipped when its keys are not set):
 //   Adzuna      ADZUNA_APP_ID, ADZUNA_APP_KEY   https://developer.adzuna.com
 //   USAJobs     USAJOBS_API_KEY, USAJOBS_EMAIL  https://developer.usajobs.gov
-//   The Muse    THEMUSE_API_KEY (optional)      https://www.themuse.com/developers/api/v2
 
 export type InternshipListing = {
   title: string;
   company: string;
   location: string;
   url: string;
-  source: "Adzuna" | "USAJobs" | "The Muse";
+  source: "Adzuna" | "USAJobs";
   postedAt: string | null;
 };
 
@@ -31,20 +30,8 @@ const PER_SOURCE = 8;
 const MAX_LISTINGS = 15;
 const TIMEOUT_MS = 8000;
 
-const STOP_WORDS = new Set([
-  "and", "the", "for", "with", "career", "careers", "work", "working", "job",
-  "jobs", "role", "field", "become", "want", "industry", "intern", "internship",
-]);
-
 export const goalKey = (goal: string) =>
   goal.toLowerCase().replace(/[^a-z0-9+# ]+/g, " ").replace(/\s+/g, " ").trim();
-
-// Words that say what the goal is about, for filtering listings.
-export function goalWords(goal: string) {
-  return goalKey(goal)
-    .split(" ")
-    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
-}
 
 function httpsUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -134,42 +121,9 @@ async function fromUsaJobs(goal: string): Promise<InternshipListing[] | null> {
   });
 }
 
-// The Muse has no keyword search, so read its newest internships and keep
-// the ones whose title or category matches the goal.
-async function fromTheMuse(goal: string): Promise<InternshipListing[] | null> {
-  const words = goalWords(goal);
-  if (words.length === 0) return [];
-
-  const out: InternshipListing[] = [];
-  for (let page = 0; page < 3 && out.length < PER_SOURCE; page++) {
-    const params = new URLSearchParams({ level: "Internship", page: String(page) });
-    if (process.env.THEMUSE_API_KEY) params.set("api_key", process.env.THEMUSE_API_KEY);
-    const data = await getJson(`https://www.themuse.com/api/public/jobs?${params}`);
-    const results = (data?.results ?? []) as any[];
-    for (const r of results) {
-      const haystack = goalKey(
-        `${r?.name} ${(r?.categories ?? []).map((c: any) => c?.name).join(" ")}`,
-      );
-      if (!words.some((w) => new RegExp(`\\b${w.replace(/[+#]/g, "\\$&")}`).test(haystack)))
-        continue;
-      out.push({
-        title: text(r?.name),
-        company: text(r?.company?.name),
-        location: text((r?.locations ?? []).map((l: any) => l?.name).join(", ")) || "See listing",
-        url: httpsUrl(r?.refs?.landing_page) ?? "",
-        source: "The Muse",
-        postedAt: typeof r?.publication_date === "string" ? r.publication_date : null,
-      });
-    }
-    if (results.length === 0 || page + 1 >= Number(data?.page_count ?? 0)) break;
-  }
-  return out;
-}
-
 const PROVIDERS = [
   { name: "Adzuna", fetch: fromAdzuna },
   { name: "USAJobs", fetch: fromUsaJobs },
-  { name: "The Muse", fetch: fromTheMuse },
 ];
 
 // ---------------------------------------------------------------------
