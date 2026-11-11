@@ -8,6 +8,11 @@ import {
   getReviewsForStudent,
   saveReview,
 } from "../Models/SkillReviewModel.js";
+import {
+  addFavorite,
+  listFavorites,
+  removeFavorite,
+} from "../Models/FacultyFavoritesModel.js";
 
 const fail = (res: Response, e: unknown) => {
   if (e instanceof ReviewError)
@@ -91,6 +96,48 @@ export const saveFacultyReview = async (req: Request, res: Response) => {
     res.json(
       await saveReview(req.user!.userId, studentId, ratings, comment || null),
     );
+  } catch (e) {
+    fail(res, e);
+  }
+};
+
+// ---------------------------------------------------------------------
+// Faculty favorites ("My advisees"): /api/faculty/reviews/favorites
+// The faculty id always comes from the login token.
+// ---------------------------------------------------------------------
+
+const studentIdParam = (req: Request) => {
+  const id = Number(req.params.studentId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+// GET /api/faculty/reviews/favorites -> your starred students
+export const getFavorites = async (req: Request, res: Response) => {
+  try {
+    res.json({ students: await listFavorites(req.user!.userId) });
+  } catch (e) {
+    fail(res, e);
+  }
+};
+
+// PUT /api/faculty/reviews/favorites/:studentId -> star a student
+export const starStudent = async (req: Request, res: Response) => {
+  const studentId = studentIdParam(req);
+  if (!studentId) return res.status(400).json({ error: "Invalid student" });
+  try {
+    res.json({ student: await addFavorite(req.user!.userId, studentId) });
+  } catch (e) {
+    fail(res, e);
+  }
+};
+
+// DELETE /api/faculty/reviews/favorites/:studentId -> unstar
+export const unstarStudent = async (req: Request, res: Response) => {
+  const studentId = studentIdParam(req);
+  if (!studentId) return res.status(400).json({ error: "Invalid student" });
+  try {
+    await removeFavorite(req.user!.userId, studentId);
+    res.status(204).end();
   } catch (e) {
     fail(res, e);
   }

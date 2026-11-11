@@ -29,6 +29,50 @@
   margin-bottom: 0.75rem;
 }
 
+.sr-head-side {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Star / unstar a student as one of "My advisees" */
+.sr-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid #e3e6ef;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sr-star:hover {
+  border-color: #ffb718;
+  color: #7a5800;
+}
+
+.sr-star.on {
+  border-color: #ffb718;
+  background: #fff1cc;
+  color: #b07d00;
+}
+
+.sr-star:focus-visible {
+  outline: 2px solid #131d43;
+  outline-offset: 2px;
+}
+
+.sr-star:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .sr-status {
   font-size: 0.75rem;
   font-weight: 600;

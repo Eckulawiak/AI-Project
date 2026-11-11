@@ -14,6 +14,9 @@ import {
 import { getAggregateProgress } from "../Controllers/ProgressController.js";
 import {
   getFacultyReviews,
+  getFavorites,
+  starStudent,
+  unstarStudent,
   getStudentsToReview,
   saveFacultyReview,
 } from "../Controllers/SkillReviewController.js";
@@ -28,6 +31,9 @@ facultyCoursesRouter.get("/courses/:courseId/mapping", getCourseMapping);
 facultyCoursesRouter.get("/progress", RequireFaculty, getAggregateProgress);
 facultyCoursesRouter.get("/reviews", RequireFaculty, getFacultyReviews);
 facultyCoursesRouter.get("/reviews/students", RequireFaculty, getStudentsToReview);
+facultyCoursesRouter.get("/reviews/favorites", RequireFaculty, getFavorites);
+facultyCoursesRouter.put("/reviews/favorites/:studentId", RequireFaculty, starStudent);
+facultyCoursesRouter.delete("/reviews/favorites/:studentId", RequireFaculty, unstarStudent);
 
 // --- Validation Routes (Must go before generic /:courseId routes) ---
 facultyCoursesRouter.get("/courses/check-code", checkCourseCode);
