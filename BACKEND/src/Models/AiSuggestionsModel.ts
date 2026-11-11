@@ -89,9 +89,15 @@ export function certWays(cert: string, officialUrl?: string | null) {
   ];
 }
 
+// QU partners with Handshake; until there is a full integration, internship
+// cards link students to its sign-in page.
+export const HANDSHAKE_SIGN_IN_URL = "https://app.joinhandshake.com/login";
+export const HANDSHAKE_SIGN_IN = `Sign in to Handshake with your QU account: ${HANDSHAKE_SIGN_IN_URL}`;
+
 export function internshipWays(search: string) {
   const terms = /intern/i.test(search) ? search : `${search} intern`;
   return [
+    HANDSHAKE_SIGN_IN,
     `Search internships on LinkedIn: https://www.linkedin.com/jobs/search/?keywords=${q(terms)}&f_E=1`,
     `Search internships on Handshake: https://app.joinhandshake.com/stu/postings?query=${q(terms)}`,
     `Search internships on Indeed: https://www.indeed.com/jobs?q=${q(terms)}`,

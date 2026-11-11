@@ -6,6 +6,8 @@ import { getAllSkillsAndCompetencies } from "./SkillsModel.js";
 import {
   certWays,
   courseWays,
+  HANDSHAKE_SIGN_IN,
+  HANDSHAKE_SIGN_IN_URL,
   internshipWays,
   normalizeSkill,
   skillWays,
@@ -399,6 +401,15 @@ async function getMilestoneRows(roadmapId: number) {
 // roadmaps, template milestones with no details, experience from the
 // assessment) get one from their category.
 function waysToComplete(row: any, careerGoal: string | null): string[] {
+  const ways = defaultWays(row, careerGoal);
+  // Every internship/experience card links to Handshake sign-in, including
+  // template rows saved with their own list.
+  if (row.category === "EXPERIENCE" && !ways.some((w) => w.includes(HANDSHAKE_SIGN_IN_URL)))
+    return [HANDSHAKE_SIGN_IN, ...ways];
+  return ways;
+}
+
+function defaultWays(row: any, careerGoal: string | null): string[] {
   const saved = (row.resources ?? []) as string[];
   if (saved.length > 0) return saved;
   const name = String(row.name ?? "");
@@ -414,13 +425,13 @@ function waysToComplete(row: any, careerGoal: string | null): string[] {
         ? internshipWays(careerGoal?.trim() || "internship")
         : [
             "Find openings through Handshake and Career Development",
-            ...internshipWays(careerGoal?.trim() || name).slice(0, 1),
+            ...internshipWays(careerGoal?.trim() || name).slice(1, 2),
           ];
     case "SKILL":
       return skillWays(name);
     default:
       return [
-        "Book a meeting with Career Development through Handshake: https://app.joinhandshake.com",
+        `Book a meeting with Career Development through Handshake: ${HANDSHAKE_SIGN_IN_URL}`,
       ];
   }
 }
