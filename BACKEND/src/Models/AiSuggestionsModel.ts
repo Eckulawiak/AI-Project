@@ -49,6 +49,14 @@ export function overlapsCourseSkill(name: string, courseSkills: string[]) {
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const q = (s: string) => encodeURIComponent(s.trim());
 
+// The issuer is shown as text, never as a link, so drop anything that
+// looks like a URL or domain.
+function issuerName(v: unknown): string | null {
+  const name = clean(v, 80);
+  if (!name || /https?:|www\.|\.(com|org|net|edu|gov|io)\b/i.test(name)) return null;
+  return name;
+}
+
 const clean = (v: unknown, max: number) =>
   typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "";
 
@@ -187,7 +195,7 @@ export function parseSuggestions(
       name,
       description: clean(c?.description, 400),
       classYear: year(c?.year),
-      resources: certWays(name, clean(c?.issuer, 80) || null),
+      resources: certWays(name, issuerName(c?.issuer)),
     });
   }
 
