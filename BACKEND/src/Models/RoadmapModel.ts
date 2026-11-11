@@ -669,9 +669,10 @@ export async function buildRoadmap(
     });
   }
 
-  // AI suggestions are optional: they change when the goal changes, so
-  // they never hold back progress, and the student should review them
-  // (REQ-SAFE-1).
+  // AI skills and certifications are optional: they change when the goal
+  // changes, so they never hold back progress, and the student should review
+  // them (REQ-SAFE-1). Internships are required, as in the career
+  // development frameworks.
   for (const s of ai ?? []) {
     add({
       template_milestone_id: null,
@@ -684,7 +685,7 @@ export async function buildRoadmap(
       competency_ids: [],
       component: null,
       resources: s.resources,
-      required: false,
+      required: s.category === "EXPERIENCE",
       status: "PENDING",
       completed_at: null,
     });

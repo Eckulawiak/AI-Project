@@ -38,7 +38,11 @@ export function overlapsCourseSkill(name: string, courseSkills: string[]) {
     if (!c) return false;
     if (c === n) return true;
     const [short, long] = c.length < n.length ? [c, n] : [n, c];
-    return short.length >= 3 && new RegExp(`\\b${escape(short)}\\b`).test(long);
+    // word boundaries that also treat + and # as part of a word (C++, C#)
+    return (
+      short.length >= 3 &&
+      new RegExp(`(?<![a-z0-9+#])${escape(short)}(?![a-z0-9+#])`).test(long)
+    );
   });
 }
 
@@ -83,7 +87,10 @@ export function skillWays(skill: string) {
 
 export function certWays(cert: string, officialUrl?: string | null) {
   return [
-    ...(officialUrl ? [`Official certification site: ${officialUrl}`] : []),
+    // The link comes from the AI, so it is labelled as a suggestion.
+    ...(officialUrl
+      ? [`Certification site suggested by AI (check it's the official one): ${officialUrl}`]
+      : []),
     `Find the official exam and study guide: https://www.google.com/search?q=${q(`${cert} certification official`)}`,
     "Ask Career Development whether QU offers vouchers or prep sessions",
   ];
@@ -164,10 +171,14 @@ export function parseSuggestions(
     const key = `${s.category}:${normalizeSkill(s.name)}`;
     if (!s.name || seen.has(key)) return;
     seen.add(key);
+    count[s.category]++;
     out.push(s);
   };
 
-  for (const s of list(json.skills).slice(0, MAX.SKILL)) {
+  const count = { SKILL: 0, CERT: 0, EXPERIENCE: 0 };
+  const full = (c: AiCategory) => count[c] >= MAX[c];
+  for (const s of list(json.skills)) {
+    if (full("SKILL")) break;
     const name = clean(s?.name, 120);
     if (!name || overlapsCourseSkill(name, courseSkills)) continue;
     push({
@@ -179,7 +190,8 @@ export function parseSuggestions(
     });
   }
 
-  for (const c of list(json.certifications).slice(0, MAX.CERT)) {
+  for (const c of list(json.certifications)) {
+    if (full("CERT")) break;
     const name = clean(c?.name, 120);
     if (!name) continue;
     push({
@@ -191,7 +203,8 @@ export function parseSuggestions(
     });
   }
 
-  for (const i of list(json.internships).slice(0, MAX.EXPERIENCE)) {
+  for (const i of list(json.internships)) {
+    if (full("EXPERIENCE")) break;
     const name = clean(i?.name, 120);
     if (!name) continue;
     push({
