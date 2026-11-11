@@ -339,7 +339,20 @@ const RoadmapPage: React.FC = () => {
               </p>
             )}
 
-            {selected.source === "CAREER_DATA" && (
+            {selected.source === "CAREER_DATA" && selected.category === "CERT" && (
+              <div className="rm-data-note" role="note">
+                <p>
+                  <i className="bi bi-patch-check" /> From the{" "}
+                  <a href="https://credentialengine.org/" target="_blank" rel="noopener noreferrer">
+                    Credential Engine Registry
+                  </a>
+                  , where certifying bodies publish their own credentials
+                  {selected.component ? `. Matched to ${selected.component}` : ""}.
+                </p>
+              </div>
+            )}
+
+            {selected.source === "CAREER_DATA" && selected.category !== "CERT" && (
               <div className="rm-data-note" role="note">
                 <p>
                   <i className="bi bi-bank" /> From O*NET&reg; occupation data

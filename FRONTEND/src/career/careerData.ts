@@ -14,7 +14,7 @@ export type MilestoneSource =
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
   | "COURSE_SKILL" // skill from a required course not completed yet
-  | "CAREER_DATA"; // skill from O*NET
+  | "CAREER_DATA"; // skill from O*NET, certification from Credential Engine
 export type CourseStatus = "NONE" | "IN_PROGRESS" | "COMPLETED";
 
 export const CATEGORIES: { id: Category; label: string; icon: string }[] = [

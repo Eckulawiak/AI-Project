@@ -13,6 +13,13 @@ const load = () => {
   return pending;
 };
 
+// Credit each job source with a link to its site. Listing links stay
+// exactly as the source gives them (Jooble's go through jooble.org).
+const SOURCE_SITES: Record<string, string> = {
+  Jooble: "https://jooble.org/",
+  USAJobs: "https://www.usajobs.gov/",
+};
+
 const posted = (iso: string | null) => {
   if (!iso) return null;
   const d = new Date(iso);
@@ -70,8 +77,20 @@ const InternshipOpenings: React.FC = () => {
             ))}
           </ul>
           <p className="rm-openings-note">
-            Listings come from {data.sources.join(", ")} and aren't reviewed by QU.
-            Check each posting before you apply.
+            Listings come from{" "}
+            {data.sources.map((s, i) => (
+              <React.Fragment key={s}>
+                {i > 0 && ", "}
+                {SOURCE_SITES[s] ? (
+                  <a href={SOURCE_SITES[s]} target="_blank" rel="noopener noreferrer">
+                    {s}
+                  </a>
+                ) : (
+                  s
+                )}
+              </React.Fragment>
+            ))}{" "}
+            and aren't reviewed by QU. Check each posting before you apply.
           </p>
         </>
       )}
