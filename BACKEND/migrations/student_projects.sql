@@ -6,6 +6,11 @@
 -- Student Dashboard and pick which ones to include each time they
 -- generate resume bullet points or talking points. Only the title,
 -- description and tools/skills are sent to the AI; never grades or IDs.
+--
+-- The shared database already has a student_projects table from the
+-- original schema (resume_bullets.project_id points at it) with id,
+-- student_id, title, description and created_at. This file creates the
+-- table where it doesn't exist and adds the newer columns where it does.
 -- =====================================================================
 
 create table if not exists student_projects (
@@ -13,11 +18,16 @@ create table if not exists student_projects (
   student_id   bigint not null references student(student_id) on delete cascade,
   title        varchar(120) not null check (length(btrim(title)) > 0),
   description  varchar(1000),
-  -- tools, technologies or skills used, e.g. {React, Teamwork}
-  skills       text[] not null default '{}',
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+  created_at   timestamptz not null default now()
 );
+
+alter table student_projects
+  -- tools, technologies or skills used, e.g. {React, Teamwork}
+  add column if not exists skills     text[]      not null default '{}',
+  add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists student_projects_student_idx
   on student_projects (student_id, created_at);
+
+-- make the API see the new columns right away
+notify pgrst, 'reload schema';
