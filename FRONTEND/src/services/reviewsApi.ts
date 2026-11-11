@@ -60,3 +60,15 @@ export const saveFacultyReview = (
     method: "PUT",
     body: JSON.stringify({ ratings, comment }),
   });
+
+// --- faculty favorites ("My advisees") ---
+export const getFavorites = () =>
+  apiClient<{ students: ReviewStudent[] }>("/api/faculty/reviews/favorites");
+
+export const starStudent = (studentId: number) =>
+  apiClient<{ student: ReviewStudent }>(`/api/faculty/reviews/favorites/${studentId}`, {
+    method: "PUT",
+  });
+
+export const unstarStudent = (studentId: number) =>
+  apiClient<object>(`/api/faculty/reviews/favorites/${studentId}`, { method: "DELETE" });

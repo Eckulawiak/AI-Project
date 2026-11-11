@@ -23,7 +23,7 @@ export type ReviewStudent = {
 };
 
 const REVIEW_COLUMNS = "id, student_id, faculty_id, ratings, comment, completed_at";
-const STUDENT_COLUMNS =
+export const STUDENT_COLUMNS =
   "student_id, firstname, lastname, student_qu_email, class_year, major, majors(name)";
 
 const fullName = (row: any) =>
@@ -38,7 +38,7 @@ function toReview(row: any): SkillReview {
   };
 }
 
-function toStudent(row: any): ReviewStudent {
+export function toStudent(row: any): ReviewStudent {
   return {
     id: row.student_id,
     name: fullName(row) || row.student_qu_email,

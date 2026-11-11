@@ -1,0 +1,210 @@
+/* "My advisees" panel on the Faculty Dashboard (matches TemplateGapsPanel) */
+
+.ma-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #131d43;
+  text-align: left;
+}
+
+.ma-head {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.ma-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ma-icon {
+  font-size: 1.15rem;
+  background: #fff1cc;
+  color: #b07d00;
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ma-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0.15rem 0 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ma-count {
+  font-size: 0.8rem;
+  background: #131d43;
+  color: #ffb718;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+}
+
+.ma-sub {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.ma-all {
+  flex: none;
+  margin-top: 0.3rem;
+  color: #131d43;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ma-all:hover {
+  text-decoration: underline;
+}
+
+.ma-msg {
+  margin: 0.9rem 0 0;
+  color: #374151;
+}
+
+.ma-msg a {
+  color: #131d43;
+  font-weight: 600;
+}
+
+.ma-error {
+  color: #b42318;
+}
+
+.ma-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 1px solid #e3e6ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ma-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.65rem 0.9rem;
+  border-top: 1px solid #eef0f5;
+}
+
+.ma-row:first-child {
+  border-top: none;
+}
+
+.ma-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ma-who strong {
+  font-size: 0.95rem;
+}
+
+.ma-meta {
+  color: #6b7280;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.ma-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  background: #f1f2f6;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+.ma-status.done {
+  background: #e3f4e8;
+  color: #1d6b38;
+}
+
+.ma-review {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #131d43;
+  background: #131d43;
+  color: #ffb718;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ma-review:hover {
+  background: #ffb718;
+  color: #131d43;
+}
+
+.ma-review:focus-visible,
+.ma-all:focus-visible,
+.ma-more:focus-visible {
+  outline: 2px solid #ffb718;
+  outline-offset: 2px;
+}
+
+.ma-more {
+  margin-top: 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #131d43;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 767.98px) {
+  .ma-card {
+    padding: 1rem;
+  }
+
+  .ma-head {
+    flex-wrap: wrap;
+  }
+
+  /* title and description take the row; the link wraps under them */
+  .ma-head-text {
+    flex: 1 1 calc(100% - 3.25rem);
+  }
+
+  .ma-all {
+    order: 3;
+    margin-left: 3.25rem;
+  }
+
+  .ma-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.4rem;
+  }
+
+  .ma-status {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .ma-review {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}

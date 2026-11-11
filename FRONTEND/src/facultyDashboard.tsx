@@ -8,6 +8,7 @@ import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
 import AddCourseMappingModal from "./AddCourseMappingModal";
 import { useSchools } from "./hooks/useSchools";
+import MyAdviseesPanel from "./components/MyAdviseesPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -394,6 +395,8 @@ const FacultyDashboard: React.FC = () => {
           <h1 className="admin-title">Faculty Dashboard</h1>
           <p className="admin-subtitle">Manage your course mappings.</p>
         </section>
+
+        <MyAdviseesPanel />
 
         {/* Filter bar */}
         <section className="admin-filter-bar">
