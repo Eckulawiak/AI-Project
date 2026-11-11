@@ -61,10 +61,16 @@ const text = (v: unknown, max = 150) =>
 
 async function getJson(url: string, headers: Record<string, string> = {}) {
   const res = await fetch(url, {
-    headers: { Accept: "application/json", ...headers },
+    // Some job sites reject requests without a browser-like User-Agent
+    // (Node's default is "node"); USAJobs sets its own.
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; QU-Career-Services/1.0)",
+      ...headers,
+    },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
   return res.json() as Promise<any>;
 }
 
