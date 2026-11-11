@@ -158,7 +158,7 @@ export interface InternshipListing {
   company: string;
   location: string;
   url: string;
-  source: string; // Adzuna, USAJobs or The Muse
+  source: string; // Adzuna or USAJobs
   postedAt: string | null;
 }
 
