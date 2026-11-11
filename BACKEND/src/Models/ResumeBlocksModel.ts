@@ -2,7 +2,7 @@
 // REQ-RES-5). New blocks are written in one AI request and split by their
 // headers; "Regenerate" on one block re-sends only that course or project.
 // One request at a time keeps free models under their rate limits.
-import { completeWithFallback } from "../Utils/openRouter.js";
+import { completeWithFallback, type AiFailure } from "../Utils/openRouter.js";
 import {
   buildResumePrompt,
   loadResumeInput,
@@ -20,12 +20,20 @@ export type ResumeBlock = {
   error?: string; // set when this block could not be generated
 };
 
-// REQ-PERF-6: each model gets 15 s before the next one is tried; the whole
-// cascade gives up after 30 s. No reply length cap: some free models spend
-// a cap on reasoning and return nothing.
-const MODEL_TIMEOUT_MS = 15000;
-const TOTAL_TIMEOUT_MS = 30000;
+// REQ-PERF-6: each model gets up to 20 s, and the models share 45 s in
+// total, so a slow first model can't leave the last one no time. No reply
+// length cap: some free models spend a cap on reasoning and return nothing.
+const MODEL_TIMEOUT_MS = 20000;
+const TOTAL_TIMEOUT_MS = 45000;
 const FAILED = "Couldn't generate bullet points. Try again.";
+const BUSY =
+  "The free AI models are busy right now. Wait a minute, then click Retry.";
+
+// The message for a block no model could write.
+const failedMessage = (failures: AiFailure[]) =>
+  failures.length > 0 && failures.every((f) => f === "busy" || f === "timeout" || f === "empty")
+    ? BUSY
+    : FAILED;
 
 export const blockKey = (kind: "course" | "project", id: number) => `${kind}:${id}`;
 
@@ -157,11 +165,13 @@ const blockFor = (section: ResumeSection) => ({
   heading: headingFor(section),
 });
 
-const ai = (prompt: string, validate: (reply: string) => void) =>
+const ai = (prompt: string, failures: AiFailure[], validate: (reply: string) => void) =>
   completeWithFallback(prompt, {
     feature: "RESUME",
     timeoutMs: MODEL_TIMEOUT_MS,
     totalTimeoutMs: TOTAL_TIMEOUT_MS,
+    lightReasoning: true,
+    failures,
     validate,
   });
 
@@ -169,14 +179,15 @@ const ai = (prompt: string, validate: (reply: string) => void) =>
 async function generateOne(input: ResumeInput, section: ResumeSection): Promise<ResumeBlock> {
   const block = blockFor(section);
   let bullets: string[] = [];
-  const text = await ai(buildBlockPrompt(input, section), (reply) => {
+  const failures: AiFailure[] = [];
+  const text = await ai(buildBlockPrompt(input, section), failures, (reply) => {
     bullets = parseBullets(reply);
     if (bullets.length === 0) throw new Error("No bullet points in the reply");
   });
   if (text == null) {
     // why each model failed is logged by completeWithFallback
     console.warn(`No resume bullets for ${block.key} (${block.heading}).`);
-    return { ...block, bullets: [], error: FAILED };
+    return { ...block, bullets: [], error: failedMessage(failures) };
   }
   return { ...block, bullets };
 }
@@ -186,7 +197,8 @@ async function generateOne(input: ResumeInput, section: ResumeSection): Promise<
 async function generateMany(input: ResumeInput): Promise<ResumeBlock[]> {
   const labels = input.sections.map((s) => s.label);
   let found = new Map<string, string[]>();
-  const text = await ai(buildResumePrompt(input), (reply) => {
+  const failures: AiFailure[] = [];
+  const text = await ai(buildResumePrompt(input), failures, (reply) => {
     found = splitSections(reply, labels);
     if (found.size === 0) throw new Error("No sections found in the reply");
   });
@@ -194,7 +206,9 @@ async function generateMany(input: ResumeInput): Promise<ResumeBlock[]> {
 
   return input.sections.map((section) => {
     const bullets = found.get(section.label);
-    return bullets ? { ...blockFor(section), bullets } : { ...blockFor(section), bullets: [], error: FAILED };
+    if (bullets) return { ...blockFor(section), bullets };
+    // the reply skipped this section, or no model replied at all
+    return { ...blockFor(section), bullets: [], error: text == null ? failedMessage(failures) : FAILED };
   });
 }
 

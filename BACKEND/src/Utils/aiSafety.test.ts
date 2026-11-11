@@ -50,7 +50,7 @@ test("the OpenRouter request body has only the model and a clean prompt", async 
   const body = buildOpenRouterBody(
     "test/model",
     "Project: Budget app. Description: built with my GPA 3.9 roommate, email jo@qu.edu, ID 7654321",
-    300,
+    { maxTokens: 300 },
   );
   assert.deepEqual(Object.keys(body).sort(), ["max_tokens", "messages", "model"]);
   assert.equal(body.messages.length, 1);
