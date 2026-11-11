@@ -6,7 +6,14 @@ export type Category = "COURSE" | "CAREER_PREP" | "SKILL" | "CERT" | "EXPERIENCE
 export type ClassYear = "FIRST" | "SOPH" | "JUNIOR" | "SENIOR";
 export type GoalType = "INDUSTRY" | "GRAD";
 export type MilestoneStatus = "PENDING" | "COMPLETE";
-export type MilestoneSource = "TEMPLATE" | "COURSE" | "GAP" | "EXPERIENCE" | "CUSTOM";
+export type MilestoneSource =
+  | "TEMPLATE"
+  | "COURSE"
+  | "GAP"
+  | "EXPERIENCE"
+  | "CUSTOM"
+  | "AI" // suggested by AI from the career goal
+  | "COURSE_SKILL"; // skill from a required course not completed yet
 export type CourseStatus = "NONE" | "IN_PROGRESS" | "COMPLETED";
 
 export const CATEGORIES: { id: Category; label: string; icon: string }[] = [
@@ -62,7 +69,7 @@ export interface Milestone {
   courseCode: string | null;
   competencies: Competency[];
   component: string | null; // framework heading, e.g. "Networking"
-  resources: string[]; // ways to work on it: courses, offices, events
+  resources: string[]; // ways to complete it; "Label: https://..." entries are links
   required: boolean; // optional milestones don't count toward progress
   completedAt: string | null;
 }
@@ -99,6 +106,7 @@ export interface RoadmapResponse {
 
 export interface MilestoneUpdateResponse {
   milestone: Milestone;
+  related?: Milestone[]; // other cards that changed with it (a course's skills)
   progress: Progress;
   crossedThreshold: number | null;
 }

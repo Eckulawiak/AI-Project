@@ -133,7 +133,10 @@ export const CareerProgressProvider: React.FC<{ children: React.ReactNode }> = (
       careerApi
         .setMilestoneStatus(id, status)
         .then((res) => {
-          if (isLatest()) replaceMilestone(id, () => res.milestone);
+          if (!isLatest()) return;
+          replaceMilestone(id, () => res.milestone);
+          // a course's skill cards are checked off (or reopened) with it
+          for (const m of res.related ?? []) replaceMilestone(m.id, () => m);
         })
         .catch((e) => {
           if (!isLatest()) return;
