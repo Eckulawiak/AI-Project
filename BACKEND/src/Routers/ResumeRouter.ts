@@ -14,7 +14,7 @@ const router = express.Router();
 // (SDS C9, ai_usage_log). Never stores the prompt or who asked. A failed
 // write is logged and ignored so it can't break generation.
 function logAiUsage(row: {
-  feature: string;
+  feature: "RESUME" | "SKILL_SUGGEST" | "INTERVIEW";
   model: string;
   latency_ms: number;
   success: boolean;
@@ -73,7 +73,9 @@ router.post("/generate", async (req, res) => {
     }
 
     let lastError: any = null;
-    const feature = mode === "skills" ? "resume_bullets" : "talking_points";
+    // ai_usage_log.feature only allows RESUME, SKILL_SUGGEST and INTERVIEW;
+    // talking points are interview prep.
+    const feature = mode === "skills" ? "RESUME" : "INTERVIEW";
     const started = Date.now();
 
     // 2. Loop through the models. If one fails, try the next.
