@@ -5,7 +5,8 @@
     "dev": "tsx watch src/Server.ts",
     "build": "tsc",
     "start": "node dist/Server.js",
-    "scrape": "tsx src/scrapeCourses.ts"
+    "scrape": "tsx src/scrapeCourses.ts",
+    "test:edge": "tsx tests/edgeCases.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
