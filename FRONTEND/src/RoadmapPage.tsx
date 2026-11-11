@@ -17,6 +17,27 @@ const yearLabel = (y: ClassYear) => CLASS_YEARS.find((c) => c.id === y)?.label ?
 const goalLabel = (g: string | null) => (g === "GRAD" ? "Graduate school" : "Industry");
 const fromAssessment = (m: Milestone) => m.source === "GAP" || m.source === "EXPERIENCE";
 
+// "Label: https://..." -> label text plus a link; anything else is plain text.
+const WayToComplete: React.FC<{ text: string }> = ({ text }) => {
+  const match = text.match(/^(.*?):?\s*(https:\/\/\S+)$/);
+  if (!match) return <>{text}</>;
+  const [, label, url] = match;
+  let host = url;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    /* keep the raw url */
+  }
+  return (
+    <>
+      {label && <>{label}: </>}
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {host} <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
+      </a>
+    </>
+  );
+};
+
 const RoadmapPage: React.FC = () => {
   const {
     loading,
@@ -267,6 +288,9 @@ const RoadmapPage: React.FC = () => {
                               {fromAssessment(ms) && (
                                 <span className="rm-badge">From assessment</span>
                               )}
+                              {ms.source === "AI" && (
+                                <span className="rm-badge rm-badge-ai">AI suggested</span>
+                              )}
                             </button>
                           </div>
                         );
@@ -299,12 +323,23 @@ const RoadmapPage: React.FC = () => {
             <h2 className="rm-panel-title">{selected.name}</h2>
             <p className="rm-panel-desc">{selected.description}</p>
 
+            {/* REQ-SAFE-1 / REQ-SAFE-2: label AI content, no promises */}
+            {selected.source === "AI" && (
+              <p className="rm-ai-note" role="note">
+                <i className="bi bi-stars" /> Suggested by AI from your career goal.
+                Check it with Career Development or your advisor before you commit
+                time or money. It doesn't guarantee any job or admission.
+              </p>
+            )}
+
             {selected.resources.length > 0 && (
               <>
-                <h3 className="rm-panel-sub">Ways to do this</h3>
+                <h3 className="rm-panel-sub">Ways to complete</h3>
                 <ul className="rm-resource-list">
                   {selected.resources.map((r) => (
-                    <li key={r}>{r}</li>
+                    <li key={r}>
+                      <WayToComplete text={r} />
+                    </li>
                   ))}
                 </ul>
               </>

@@ -4,6 +4,16 @@ import { chunk, fetchAllPages, getCoursesByIds } from "./CoursesModel.js";
 import { getMappingsForCourseIds } from "./CourseSkillMappingModel.js";
 import { getAllSkillsAndCompetencies } from "./SkillsModel.js";
 import {
+  certWays,
+  courseWays,
+  HANDSHAKE_SIGN_IN,
+  HANDSHAKE_SIGN_IN_URL,
+  internshipWays,
+  normalizeSkill,
+  skillWays,
+  suggestForCareerGoal,
+} from "./AiSuggestionsModel.js";
+import {
   CLASS_YEARS,
   classYearForCourse,
   computeProgress,
@@ -23,7 +33,9 @@ export type MilestoneSource =
   | "COURSE"
   | "GAP"
   | "EXPERIENCE"
-  | "CUSTOM";
+  | "CUSTOM"
+  | "AI" // suggested by AI from the career goal
+  | "COURSE_SKILL"; // a skill taught in a required course not yet completed
 
 export type StudentProfile = {
   firstName: string;
@@ -385,7 +397,50 @@ async function getMilestoneRows(roadmapId: number) {
   return (data ?? []) as any[];
 }
 
-function toMilestone(row: any, lookup: Map<number, Competency>): Milestone {
+// Every card gets a "ways to complete" list. Rows saved without one (older
+// roadmaps, template milestones with no details, experience from the
+// assessment) get one from their category.
+function waysToComplete(row: any, careerGoal: string | null): string[] {
+  const ways = defaultWays(row, careerGoal);
+  // Every internship/experience card links to Handshake sign-in, including
+  // template rows saved with their own list.
+  if (row.category === "EXPERIENCE" && !ways.some((w) => w.includes(HANDSHAKE_SIGN_IN_URL)))
+    return [HANDSHAKE_SIGN_IN, ...ways];
+  return ways;
+}
+
+function defaultWays(row: any, careerGoal: string | null): string[] {
+  const saved = (row.resources ?? []) as string[];
+  if (saved.length > 0) return saved;
+  const name = String(row.name ?? "");
+  switch (row.category) {
+    case "COURSE": {
+      const code = row.courses?.course_code;
+      return code ? courseWays(code) : ["Register for this course during your registration window"];
+    }
+    case "CERT":
+      return certWays(name.replace(/^(earn|get|complete)\s+(the\s+|a\s+|an\s+)?/i, ""));
+    case "EXPERIENCE":
+      return /intern/i.test(name)
+        ? internshipWays(careerGoal?.trim() || "internship")
+        : [
+            "Find openings through Handshake and Career Development",
+            ...internshipWays(careerGoal?.trim() || name).slice(1, 2),
+          ];
+    case "SKILL":
+      return skillWays(name);
+    default:
+      return [
+        `Book a meeting with Career Development through Handshake: ${HANDSHAKE_SIGN_IN_URL}`,
+      ];
+  }
+}
+
+function toMilestone(
+  row: any,
+  lookup: Map<number, Competency>,
+  careerGoal: string | null = null,
+): Milestone {
   return {
     id: row.id,
     name: row.name,
@@ -400,7 +455,7 @@ function toMilestone(row: any, lookup: Map<number, Competency>): Milestone {
       .map((id) => lookup.get(Number(id)))
       .filter((x): x is Competency => !!x),
     component: row.component ?? null,
-    resources: row.resources ?? [],
+    resources: waysToComplete(row, careerGoal),
     required: row.required !== false,
     completedAt: row.completed_at ?? null,
   };
@@ -458,6 +513,27 @@ export async function buildRoadmap(
   else if (profile.majorId != null)
     await resolveTemplateGap(profile.majorId, profile.goalType ?? "INDUSTRY");
 
+  const courses =
+    profile.majorId != null
+      ? await getRoadmapCoursesForMajor(profile.majorId, competencies)
+      : [];
+  const history = await getCourseHistory(studentId);
+
+  // AI suggestions from the career goal only. They must not repeat any
+  // skill the major's courses already teach. null = AI unavailable.
+  const courseSkills = [...new Set(courses.flatMap((c) => c.skills))];
+  const ai = profile.careerGoal?.trim()
+    ? await suggestForCareerGoal({
+        careerGoal: profile.careerGoal,
+        goalType: profile.goalType,
+        courseSkills,
+        earliestYear: profile.classYear ?? "FIRST",
+      }).catch((e) => {
+        console.error("AI roadmap suggestions failed:", e);
+        return null;
+      })
+    : [];
+
   const { data: roadmap, error: roadmapError } = await supabase
     .from("student_roadmaps")
     .upsert(
@@ -478,16 +554,14 @@ export async function buildRoadmap(
     .delete()
     .eq("roadmap_id", roadmap.id);
   if (!fresh) toDelete = toDelete.eq("status", "PENDING");
+  // If the AI is down, keep the suggestions it made last time (REQ-PERF-6).
+  if (!fresh && ai === null) toDelete = toDelete.neq("source", "AI");
   const { error: deleteError } = await toDelete;
   if (deleteError) throw new Error(deleteError.message);
 
-  const [kept, templateMilestones, courses, history, weak] = await Promise.all([
+  const [kept, templateMilestones, weak] = await Promise.all([
     getMilestoneRows(roadmap.id),
     template ? getTemplateMilestones(template.id) : Promise.resolve([]),
-    profile.majorId != null
-      ? getRoadmapCoursesForMajor(profile.majorId, competencies)
-      : Promise.resolve([]),
-    getCourseHistory(studentId),
     getWeakCompetencyIds(studentId),
   ]);
 
@@ -566,10 +640,54 @@ export async function buildRoadmap(
       source: "COURSE",
       competency_ids: c.competencies.map((x) => x.id),
       component: null,
-      resources: [], // rows in one insert must share columns (no defaults)
+      resources: courseWays(c.courseCode, c.courseName),
       required: true, // major requirements
       status: done ? "COMPLETE" : "PENDING",
       completed_at: done ? now : null,
+    });
+  }
+
+  // Skills track: the skills taught in required courses the student hasn't
+  // completed yet, one card per skill, in the year of its earliest course.
+  for (const s of courseSkillMilestones(courses, history)) {
+    add({
+      template_milestone_id: null,
+      course_id: null, // keyed by name; the course has its own card
+      category: "SKILL",
+      class_year: s.classYear,
+      name: s.name,
+      description: `Taught in ${s.courses.map((c) => c.courseCode).join(", ")}.`,
+      source: "COURSE_SKILL",
+      competency_ids: s.competencyIds,
+      component: null,
+      resources: s.courses.flatMap((c, i) =>
+        courseWays(c.courseCode, c.courseName).slice(0, i === 0 ? 2 : 1),
+      ),
+      required: true,
+      status: "PENDING",
+      completed_at: null,
+    });
+  }
+
+  // AI skills and certifications are optional: they change when the goal
+  // changes, so they never hold back progress, and the student should review
+  // them (REQ-SAFE-1). Internships are required, as in the career
+  // development frameworks.
+  for (const s of ai ?? []) {
+    add({
+      template_milestone_id: null,
+      course_id: null,
+      category: s.category,
+      class_year: s.classYear,
+      name: s.name,
+      description: s.description,
+      source: "AI",
+      competency_ids: [],
+      component: null,
+      resources: s.resources,
+      required: s.category === "EXPERIENCE",
+      status: "PENDING",
+      completed_at: null,
     });
   }
 
@@ -600,7 +718,7 @@ export async function getRoadmapPayload(
   ]);
 
   const lookup = new Map(competencies.map((c) => [c.id, c]));
-  const milestones = rows.map((r) => toMilestone(r, lookup));
+  const milestones = rows.map((r) => toMilestone(r, lookup, profile.careerGoal));
 
   return {
     profile,
@@ -678,16 +796,130 @@ export async function setMilestoneStatus(
     }
   }
 
-  const updatedRows = rows.map((r) => (r.id === milestoneId ? data : r));
+  // A course's skill cards follow the course.
+  let updatedRows = rows.map((r) => (r.id === milestoneId ? data : r));
+  if (target.course_id && target.category === "COURSE") {
+    try {
+      updatedRows = await syncCourseSkills(
+        studentId,
+        roadmap.id,
+        target.course_id,
+        status,
+        updatedRows,
+      );
+    } catch (e) {
+      console.error("Failed to sync course skills:", e);
+    }
+  }
   const progress = computeProgress(updatedRows);
   const lookup = new Map((await getCompetencies()).map((c) => [c.id, c]));
 
+  const statusBefore = new Map(rows.map((r) => [r.id, r.status]));
+  const related = updatedRows
+    .filter((r) => r.id !== milestoneId && statusBefore.get(r.id) !== r.status)
+    .map((r) => toMilestone(r, lookup));
+
   return {
     milestone: toMilestone(data, lookup),
+    related, // other cards that changed with it (a course's skills)
     progress,
     crossedThreshold:
       status === "COMPLETE" ? crossedThreshold(before, progress.overall) : null,
   };
+}
+
+// Skill cards for courses not completed yet. A skill several courses teach
+// gets one card listing all of them; skills a completed course already
+// covers are left out.
+export function courseSkillMilestones(
+  courses: RoadmapCourse[],
+  history: Map<number, string>,
+) {
+  const covered = new Set(
+    courses
+      .filter((c) => history.get(c.courseId) === "COMPLETED")
+      .flatMap((c) => c.skills.map(normalizeSkill)),
+  );
+  const bySkill = new Map<
+    string,
+    { name: string; courses: RoadmapCourse[]; competencyIds: Set<number> }
+  >();
+  for (const c of courses) {
+    if (history.get(c.courseId) === "COMPLETED") continue;
+    for (const skill of c.skills) {
+      const key = normalizeSkill(skill);
+      if (!key || covered.has(key)) continue;
+      const entry = bySkill.get(key) ?? {
+        name: skill.trim(),
+        courses: [],
+        competencyIds: new Set<number>(),
+      };
+      entry.courses.push(c);
+      c.competencies.forEach((x) => entry.competencyIds.add(x.id));
+      bySkill.set(key, entry);
+    }
+  }
+  return [...bySkill.values()].map((s) => {
+    const years = s.courses.map((c) =>
+      CLASS_YEARS.indexOf(classYearForCourse(c.courseCode)),
+    );
+    return {
+      name: s.name,
+      courses: s.courses,
+      competencyIds: [...s.competencyIds],
+      classYear: CLASS_YEARS[Math.min(...years)]!,
+    };
+  });
+}
+
+// Completing a course completes the skill cards it teaches; un-completing
+// it reopens the ones no other completed course covers.
+async function syncCourseSkills(
+  studentId: number,
+  roadmapId: number,
+  courseId: number,
+  status: MilestoneStatus,
+  rows: any[],
+) {
+  const mappings = await getMappingsForCourseIds([courseId]);
+  const skills = new Set(
+    (mappings.get(courseId)?.skills ?? []).map(normalizeSkill),
+  );
+  if (skills.size === 0) return rows;
+
+  if (status === "PENDING") {
+    const history = await getCourseHistory(studentId);
+    const done = [...history]
+      .filter(([, s]) => s === "COMPLETED")
+      .map(([id]) => id);
+    const others = await getMappingsForCourseIds(done);
+    for (const m of others.values())
+      m.skills.forEach((s) => skills.delete(normalizeSkill(s)));
+  }
+
+  const want = status === "COMPLETE" ? "PENDING" : "COMPLETE";
+  const ids = rows
+    .filter(
+      (r) =>
+        r.source === "COURSE_SKILL" &&
+        r.status === want &&
+        skills.has(normalizeSkill(r.name)),
+    )
+    .map((r) => r.id as number);
+  if (ids.length === 0) return rows;
+
+  const completedAt = status === "COMPLETE" ? new Date().toISOString() : null;
+  const { error } = await supabase
+    .from("student_milestones")
+    .update({ status, completed_at: completedAt })
+    .eq("roadmap_id", roadmapId)
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+
+  const changed = new Set(ids);
+  return rows.map((r) =>
+    changed.has(r.id) ? { ...r, status, completed_at: completedAt } : r,
+  );
 }
 
 const EXPERIENCE_CATEGORY: Record<string, Category> = {

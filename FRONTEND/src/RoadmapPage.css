@@ -350,6 +350,25 @@
   color: #34506e;
 }
 
+.rm-badge-ai {
+  background: #ece6fb;
+  color: #4b2f8f;
+}
+
+.rm-ai-note {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  background: #f5f1fd;
+  color: #3d2a73;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.rm-resource-list a {
+  overflow-wrap: anywhere;
+}
+
 /* Mobile tabs (hidden on desktop) */
 .rm-tabs {
   display: none;
