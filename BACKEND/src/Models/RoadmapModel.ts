@@ -12,7 +12,6 @@ import {
   normalizeSkill,
   skillWays,
   suggestForCareerGoal,
-  type AiSuggestion,
 } from "./AiSuggestionsModel.js";
 import {
   careerDataSuggestions,
@@ -43,7 +42,7 @@ export type MilestoneSource =
   | "CUSTOM"
   | "AI" // suggested by AI from the career goal
   | "COURSE_SKILL" // a skill taught in a required course not yet completed
-  | "CAREER_DATA"; // skill or certification from O*NET / CareerOneStop
+  | "CAREER_DATA"; // skill from O*NET
 
 export type StudentProfile = {
   firstName: string;
@@ -531,9 +530,9 @@ export async function buildRoadmap(
   // the major's courses already teach.
   //  1. O*NET finds occupations matching the goal; the AI picks the best
   //     one in the same call that suggests internships.
-  //  2. Skills and certifications come from that occupation's Department
-  //     of Labor data (O*NET, CareerOneStop) when it can be looked up, and
-  //     from the AI otherwise.
+  //  2. Skills come from that occupation's O*NET data when it can be
+  //     looked up, and from the AI otherwise. Certifications come from
+  //     the AI.
   // null = that source was unavailable this time.
   const courseSkills = [...new Set(courses.flatMap((c) => c.skills))];
   const earliestYear = profile.classYear ?? "FIRST";
@@ -565,14 +564,12 @@ export async function buildRoadmap(
       })
     : null;
 
-  const fromData = careerData
+  const dataItems = careerData
     ? careerDataSuggestions(careerData, { courseSkills, earliestYear })
-    : { skills: [], certifications: [] };
-  const useAi = (category: AiSuggestion["category"]) =>
-    category === "EXPERIENCE" ||
-    (category === "SKILL" ? fromData.skills.length === 0 : fromData.certifications.length === 0);
-  const aiItems = (ai?.items ?? []).filter((s) => useAi(s.category));
-  const dataItems = [...fromData.skills, ...fromData.certifications];
+    : [];
+  const aiItems = (ai?.items ?? []).filter(
+    (s) => s.category !== "SKILL" || dataItems.length === 0,
+  );
 
   const { data: roadmap, error: roadmapError } = await supabase
     .from("student_roadmaps")
@@ -737,8 +734,8 @@ export async function buildRoadmap(
     });
   }
 
-  // Department of Labor skills and certifications, optional like the AI
-  // ones. component holds the occupation they come from.
+  // O*NET skills, optional like the AI ones. component holds the
+  // occupation they come from.
   for (const s of dataItems) {
     add({
       template_milestone_id: null,
