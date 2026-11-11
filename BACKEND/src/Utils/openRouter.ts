@@ -140,7 +140,18 @@ export async function completeWithFallback(
     }
     const result: any = await response.json();
     const text = replyText(result);
-    if (!text) throw new AiError("Empty response", "empty");
+    if (!text) {
+      // say why, e.g. "length" when reasoning used up the room for an answer
+      const choice = result?.choices?.[0];
+      const why = [
+        choice?.finish_reason && `finish_reason=${choice.finish_reason}`,
+        result?.usage?.completion_tokens != null &&
+          `completion_tokens=${result.usage.completion_tokens}`,
+        choice?.message?.reasoning && "reply had reasoning but no answer",
+        result?.error?.message && `error=${result.error.message}`,
+      ].filter(Boolean);
+      throw new AiError(`Empty response${why.length ? ` (${why.join(", ")})` : ""}`, "empty");
+    }
     try {
       validate?.(text);
     } catch (e: any) {
