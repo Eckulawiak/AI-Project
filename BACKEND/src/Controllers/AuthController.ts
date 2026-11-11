@@ -372,7 +372,7 @@ export const getProfile = async (req: Request, res: Response) => {
     if (userType === "Student") {
       const { data, error } = await supabase
         .from("student")
-        .select("firstname, lastname, student_qu_email, major, major_id")
+        .select("firstname, lastname, student_qu_email, major, major_id, career_goal")
         .eq("student_id", userId)
         .single();
       if (error || !data)
@@ -383,6 +383,7 @@ export const getProfile = async (req: Request, res: Response) => {
         email: data.student_qu_email,
         major: data.major,
         majorId: data.major_id,
+        careerGoal: data.career_goal ?? null,
       });
     } else {
       const { data, error } = await supabase

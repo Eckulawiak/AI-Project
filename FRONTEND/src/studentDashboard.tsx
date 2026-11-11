@@ -1,24 +1,20 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase } from "../supabaseClient";
 import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
 import { apiClient } from "./services/apiClient";
 import { useSchools } from "./hooks/useSchools";
-
-const getVal = (obj: any, key: string) => {
-  if (!obj) return undefined;
-  if (obj[key] !== undefined) return obj[key];
-  if (obj[key.toLowerCase()] !== undefined) return obj[key.toLowerCase()];
-  if (obj[key.toUpperCase()] !== undefined) return obj[key.toUpperCase()];
-  return undefined;
-};
+import ResumeProjects from "./components/ResumeProjects";
+import CareerGoalsInput from "./components/CareerGoalsInput";
+import {
+  generateResumeContent,
+  type GenerationMode,
+  type ResumeSection,
+} from "./services/projectsApi";
 
 // Used until the student's own major is known
 const DEFAULT_MAJOR = "Software Engineering";
-
-type GenerationMode = "skills" | "talkingPoints";
 
 interface CourseOffering {
   id: string;
@@ -31,12 +27,6 @@ interface ClassOption {
   offerings: CourseOffering[];
 }
 
-interface Skill {
-  Skill_Id: string;
-  Skill_Name: string;
-  Type: boolean;
-}
-
 const StudentDashboard: React.FC = () => {
   const schools = useSchools();
   const [schoolId, setSchoolId] = useState<number | null>(null);
@@ -46,13 +36,17 @@ const StudentDashboard: React.FC = () => {
     Record<string, string>
   >({});
   const [bullets, setBullets] = useState<string[]>([]);
-  const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
+  // which course or project each header in the AI output belongs to
+  const [sections, setSections] = useState<ResumeSection[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [careerGoals, setCareerGoals] = useState<string[]>([""]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showToast, setShowToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
   const [generationMode, setGenerationMode] =
     useState<GenerationMode>("skills");
@@ -84,10 +78,14 @@ const StudentDashboard: React.FC = () => {
     (async () => {
       let start = null;
       try {
-        const me = await apiClient<{ major?: string; majorId?: number | null }>(
-          "/api/auth/me",
-        );
+        const me = await apiClient<{
+          major?: string;
+          majorId?: number | null;
+          careerGoal?: string | null;
+        }>("/api/auth/me");
         start = pick(me.majorId, me.major);
+        const goal = me.careerGoal?.trim();
+        if (goal) setCareerGoals((prev) => (prev.some((g) => g.trim()) ? prev : [goal]));
       } catch {
         // not a student session; fall back to the default below
       }
@@ -164,93 +162,6 @@ const StudentDashboard: React.FC = () => {
     }, {});
   }, [availableClasses]);
 
-  // 3. LOAD SKILLS WHEN THE CLASSES CHANGE
-  useEffect(() => {
-    const loadSkillsForClasses = async () => {
-      if (!availableClasses || availableClasses.length === 0) {
-        setCourseSkills({});
-        return;
-      }
-
-      setIsLoadingSkills(true);
-
-      try {
-        const allOfferingIds = availableClasses
-          .flatMap((c) => c.offerings.map((o) => Number(o.id)))
-          .filter((n) => !isNaN(n) && n > 0);
-
-        if (allOfferingIds.length === 0) {
-          setCourseSkills({});
-          setIsLoadingSkills(false);
-          return;
-        }
-
-        const { data: mappingsData, error: mappingsError } = await supabase
-          .from("courses_skill_mapping")
-          .select("*")
-          .in("course_id", allOfferingIds);
-
-        if (mappingsError) throw mappingsError;
-
-        if (!mappingsData || mappingsData.length === 0) {
-          setCourseSkills({});
-          return;
-        }
-
-        const skillIds = [
-          ...new Set(mappingsData.map((m) => getVal(m, "skill_id"))),
-        ];
-
-        const { data: skillsData, error: skillsError } = await supabase
-          .from("skills")
-          .select("*")
-          .in("skill_id", skillIds);
-
-        if (skillsError) throw skillsError;
-
-        const allSkills = (skillsData || []).map((s) => ({
-          Skill_Id: getVal(s, "skill_id"),
-          Skill_Name: getVal(s, "skill_name"),
-          Type: getVal(s, "type"),
-        }));
-
-        const skillsLookup: Record<string, Skill[]> = {};
-
-        mappingsData.forEach((mapping) => {
-          const mCourseId = getVal(mapping, "course_id");
-          const mSkillId = getVal(mapping, "skill_id");
-          const key = String(mCourseId);
-
-          const skillDetail = allSkills.find(
-            (s) => String(s.Skill_Id) === String(mSkillId),
-          );
-
-          if (skillDetail) {
-            if (!skillsLookup[key]) skillsLookup[key] = [];
-            if (
-              !skillsLookup[key].some(
-                (s) => s.Skill_Id === skillDetail.Skill_Id,
-              )
-            ) {
-              skillsLookup[key].push(skillDetail);
-            }
-          }
-        });
-
-        setCourseSkills(skillsLookup);
-      } catch (error: any) {
-        console.error("Error loading skills:", error);
-        setErrorMsg(
-          `Database Error: ${error.message || "Failed to load skills"}`,
-        );
-      } finally {
-        setIsLoadingSkills(false);
-      }
-    };
-
-    loadSkillsForClasses();
-  }, [availableClasses]);
-
   const toggleCourse = (courseCode: string) => {
     setCheckedCodes((prev) => {
       const next = new Set(prev);
@@ -284,22 +195,40 @@ const StudentDashboard: React.FC = () => {
     (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
   ).length;
 
+  const toggleProject = (id: number) => {
+    setSelectedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setBullets([]);
+  };
+
+  const removeProjectFromSelection = (id: number) => {
+    setSelectedProjectIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setBullets([]);
+  };
+
   const generateWithAI = async (
-    skillsByClass: Record<string, string[]>,
+    courseIds: number[],
+    projectIds: number[],
     mode: GenerationMode,
   ) => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const payload = {
-        skillsByClass,
+      const result = await generateResumeContent({
         mode,
-      };
-
-      const result = await apiClient<{ text: string }>("/api/resume/generate", {
-        method: "POST",
-        body: JSON.stringify(payload),
+        courseIds,
+        projectIds,
+        careerGoals: careerGoals.map((g) => g.trim()).filter(Boolean),
       });
 
       const formattedBullets = result.text
@@ -308,12 +237,19 @@ const StudentDashboard: React.FC = () => {
         .filter((line: string) => line.length > 0);
 
       setBullets(formattedBullets);
-    } catch (error: any) {
+      setSections(result.sections ?? []);
+    } catch (error) {
       console.error("AI Generation Error:", error);
-      setErrorMsg(
+      const fallback =
         mode === "skills"
           ? "Failed to generate resume bullet points."
-          : "Failed to generate talking points.",
+          : "Failed to generate talking points.";
+      // show the server's reason for a bad selection; hide raw errors
+      const msg = error instanceof Error ? error.message : "";
+      setErrorMsg(
+        /^(Select|Pick|Enter|Keep|No skills|Career goals)/.test(msg)
+          ? msg
+          : fallback,
       );
     } finally {
       setIsLoading(false);
@@ -321,40 +257,27 @@ const StudentDashboard: React.FC = () => {
   };
 
   const handleGenerate = () => {
-    if (!availableClasses || availableClasses.length === 0) {
-      setBullets([`No classes are listed for ${major} yet.`]);
-      return;
-    }
+    const courseIds = availableClasses
+      .map((course) => Number(getResolvedId(course)))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const projectIds = [...selectedProjectIds];
 
-    if (checkedCodes.size === 0) {
+    if (courseIds.length === 0 && projectIds.length === 0) {
+      if (availableClasses.length === 0) {
+        setBullets([
+          `No classes are listed for ${major} yet. Add a project to generate.`,
+        ]);
+        return;
+      }
       setBullets([
         generationMode === "skills"
-          ? "Select at least one class to generate bullet points."
-          : "Select at least one class to generate talking points.",
+          ? "Select at least one class or project to generate bullet points."
+          : "Select at least one class or project to generate talking points.",
       ]);
       return;
     }
 
-    const skillsByClass: Record<string, string[]> = {};
-
-    availableClasses.forEach((course) => {
-      const resolvedId = getResolvedId(course);
-      if (!resolvedId) return;
-
-      const skills = courseSkills[resolvedId];
-      if (skills && skills.length > 0) {
-        skillsByClass[course.courseCode] = skills
-          .map((skill) => skill.Skill_Name)
-          .filter(Boolean);
-      }
-    });
-
-    if (Object.keys(skillsByClass).length === 0) {
-      setBullets(["No skills found in the database for the selected classes."]);
-      return;
-    } else {
-      generateWithAI(skillsByClass, generationMode);
-    }
+    generateWithAI(courseIds, projectIds, generationMode);
   };
 
   const handleCopy = () => {
@@ -451,8 +374,23 @@ const StudentDashboard: React.FC = () => {
         throw new Error("No talking points were found to save.");
       }
 
-      for (const [courseCode, talkingPoints] of entries) {
-        const courseName = courseNameByCode[courseCode] ?? courseCode;
+      for (const [label, talkingPoints] of entries) {
+        const section = sections.find(
+          (s) => s.label.toLowerCase() === label.toLowerCase(),
+        );
+        // Project talking points are saved under "PROJECT" with the title.
+        const courseCode =
+          section?.kind === "project"
+            ? "PROJECT"
+            : section?.kind === "course"
+              ? section.courseCode
+              : label;
+        const courseName =
+          section?.kind === "project"
+            ? section.title
+            : section?.kind === "course"
+              ? section.courseName
+              : (courseNameByCode[label] ?? label);
 
         await apiClient("/api/history", {
           method: "POST",
@@ -556,13 +494,6 @@ const StudentDashboard: React.FC = () => {
                 >
                   Loading classes...
                 </p>
-              ) : isLoadingSkills ? (
-                <p
-                  className="text-muted"
-                  style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
-                >
-                  Loading skills from database...
-                </p>
               ) : availableClasses && availableClasses.length > 0 ? (
                 <div className="class-grid">
                   {availableClasses.map((course, index) => {
@@ -660,6 +591,21 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
 
+            <ResumeProjects
+              selectedIds={selectedProjectIds}
+              onToggle={toggleProject}
+              onAdded={(id) => toggleProject(id)}
+              onDeleted={removeProjectFromSelection}
+            />
+
+            <CareerGoalsInput
+              goals={careerGoals}
+              onChange={(goals) => {
+                setCareerGoals(goals);
+                setBullets([]);
+              }}
+            />
+
             <div
               className="generate-row"
               style={{
@@ -720,7 +666,7 @@ const StudentDashboard: React.FC = () => {
                 type="button"
                 className={`btn-generate ${isLoading ? "btn-loading" : ""}`}
                 onClick={handleGenerate}
-                disabled={isLoading || isLoadingSkills || needsSectionCount > 0}
+                disabled={isLoading || needsSectionCount > 0}
               >
                 {isLoading
                   ? "Generating..."
@@ -795,8 +741,8 @@ const StudentDashboard: React.FC = () => {
                 <p className="error-text">{errorMsg}</p>
               ) : bullets.length === 0 ? (
                 <p className="placeholder-text">
-                  Select classes and click "Generate" to see your AI-generated
-                  content.
+                  Select classes or projects and click "Generate" to see your
+                  AI-generated content.
                 </p>
               ) : (
                 <ul>

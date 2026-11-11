@@ -16,6 +16,7 @@ import publicCourseRouter from "./Routers/PublicCourseRouter.js"; // <-- NEW
 import { roadmapRouter, milestonesRouter } from "./Routers/RoadmapRouter.js";
 import { assessmentRouter } from "./Routers/AssessmentRouter.js";
 import { skillReviewRouter } from "./Routers/SkillReviewRouter.js";
+import { studentProjectRouter } from "./Routers/StudentProjectRouter.js";
 
 // --- Middleware Imports ---
 import { RequireAdmin, RequireAuth } from "./Middleware/RequireAuth.js";
@@ -41,11 +42,12 @@ app.use("/api/faculty", RequireAuth, facultyCoursesRouter);
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
 app.use("/api/audit-logs", AuditRouter);
 app.use("/api/autofill", autofillRouter);
-app.use("/api/resume", resumeRouter);
+app.use("/api/resume", RequireStudent, resumeRouter);
 app.use("/api/roadmap", RequireStudent, roadmapRouter);
 app.use("/api/milestones", RequireStudent, milestonesRouter);
 app.use("/api/assessment", RequireStudent, assessmentRouter);
 app.use("/api/reviews", RequireStudent, skillReviewRouter);
+app.use("/api/projects", RequireStudent, studentProjectRouter);
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
