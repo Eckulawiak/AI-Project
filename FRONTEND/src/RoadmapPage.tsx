@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./footer";
 import { useCareerProgress } from "./context/careerProgress";
+import InternshipOpenings from "./components/InternshipOpenings";
 import {
   CATEGORIES,
   CLASS_YEARS,
@@ -343,6 +344,10 @@ const RoadmapPage: React.FC = () => {
                   ))}
                 </ul>
               </>
+            )}
+
+            {selected.category === "EXPERIENCE" && selected.status !== "COMPLETE" && (
+              <InternshipOpenings />
             )}
 
             <dl className="rm-panel-facts">

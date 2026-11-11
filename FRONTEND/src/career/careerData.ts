@@ -151,3 +151,19 @@ export interface AssessmentSubmission {
   ratings: Record<string, number>;
   experience: ExperienceEntry[];
 }
+
+export interface InternshipListing {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source: string; // Adzuna, USAJobs or The Muse
+  postedAt: string | null;
+}
+
+export interface InternshipListings {
+  goal: string;
+  listings: InternshipListing[];
+  sources: string[];
+  fetchedAt: string;
+}

@@ -4,6 +4,7 @@ import type {
   Assessment,
   AssessmentOptions,
   AssessmentSubmission,
+  InternshipListings,
   MilestoneStatus,
   MilestoneUpdateResponse,
   Progress,
@@ -36,3 +37,6 @@ export const submitAssessment = (body: AssessmentSubmission) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+export const getInternships = () =>
+  apiClient<InternshipListings>("/api/roadmap/internships");
