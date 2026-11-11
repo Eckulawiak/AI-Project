@@ -12,7 +12,8 @@ import {
 //
 //   O*NET Web Services (ONET_API_KEY)        https://services.onetcenter.org
 //     goal -> occupations (keyword search), occupation -> technology skills
-//   CareerOneStop (CAREERONESTOP_USER_ID, CAREERONESTOP_TOKEN)
+//   CareerOneStop (CAREERONESTOP_USER_ID, CAREERONESTOP_TOKEN) - ON HOLD:
+//     not set up yet, so certifications come from the AI until it is.
 //     occupation -> certifications, with the certifying body's official URL
 //     https://www.careeronestop.org/Developers/WebAPI/web-api.aspx
 //

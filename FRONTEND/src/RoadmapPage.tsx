@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import Footer from "./footer";
 import { useCareerProgress } from "./context/careerProgress";
 import InternshipOpenings from "./components/InternshipOpenings";
+import OnetAttribution from "./components/OnetAttribution";
 import {
   CATEGORIES,
   CLASS_YEARS,
@@ -306,6 +307,8 @@ const RoadmapPage: React.FC = () => {
             );
           })}
         </section>
+        {/* O*NET license: credit on any page that shows O*NET data */}
+        {milestones.some((m) => m.source === "CAREER_DATA") && <OnetAttribution />}
       </main>
 
       {/* Milestone detail panel */}
@@ -337,12 +340,14 @@ const RoadmapPage: React.FC = () => {
             )}
 
             {selected.source === "CAREER_DATA" && (
-              <p className="rm-data-note" role="note">
-                <i className="bi bi-bank" /> From U.S. Department of Labor data
-                {selected.component ? ` for ${selected.component}` : ""} (
-                {selected.category === "CERT" ? "CareerOneStop" : "O*NET"}), matched to
-                your career goal.
-              </p>
+              <div className="rm-data-note" role="note">
+                <p>
+                  <i className="bi bi-bank" /> From O*NET&reg; occupation data
+                  {selected.component ? ` for ${selected.component}` : ""}, matched to
+                  your career goal.
+                </p>
+                <OnetAttribution compact />
+              </div>
             )}
 
             {selected.resources.length > 0 && (

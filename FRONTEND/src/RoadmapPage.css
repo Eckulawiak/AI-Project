@@ -599,3 +599,32 @@
   color: #5b6472;
   margin: 0 0 1rem;
 }
+
+/* O*NET Web Services attribution (required by its license) */
+.rm-onet-credit {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #5b6472;
+}
+
+.rm-onet-credit p {
+  margin: 0;
+}
+
+.rm-onet-credit img {
+  flex-shrink: 0;
+  height: auto;
+}
+
+.rm-onet-credit.compact {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+}
+
+.rm-data-note p {
+  margin: 0;
+}
