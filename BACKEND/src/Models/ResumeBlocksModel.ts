@@ -19,9 +19,11 @@ export type ResumeBlock = {
   error?: string; // set when this block could not be generated
 };
 
-// REQ-PERF-1/6: bullets within about 5 s; give up after 15 s in total.
-const TOTAL_TIMEOUT_MS = 15000;
-const MAX_TOKENS = 350;
+// REQ-PERF-6: each model gets 15 s before the next one is tried; the whole
+// cascade gives up after 30 s. No reply length cap: some free models spend
+// a cap on reasoning and return nothing.
+const MODEL_TIMEOUT_MS = 15000;
+const TOTAL_TIMEOUT_MS = 30000;
 const PARALLEL = 4;
 
 export const blockKey = (kind: "course" | "project", id: number) => `${kind}:${id}`;
@@ -78,20 +80,38 @@ Rules:
 `;
 }
 
-// The bullet lines of an AI reply, without markers or headings.
+// "- ", "* ", "• ", "– ", "1. ", "2) " and similar bullet markers
+const MARKER = /^(?:[-*•‣▪●·–—]|\d+[.)])\s*/;
+
+const tidy = (line: string) =>
+  line
+    .replace(MARKER, "")
+    .replace(/\*\*|__|`/g, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+// Lines that are chatter or headings rather than bullet points.
+const isChatter = (line: string) =>
+  line.endsWith(":") ||
+  /^(here (are|is)|sure|certainly|these bullet|bullet points?\b|note:|i hope|let me know)/i.test(
+    line,
+  );
+
+// The bullet lines of an AI reply, without markers or headings. Models
+// don't always use "- ", so any common marker works, and a reply with no
+// markers at all falls back to its sentence lines.
 export function parseBullets(text: string): string[] {
-  return text
+  const lines = text
+    .replace(/```[a-z]*/gi, "")
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => /^([-*•]|\d+[.)])\s+/.test(line))
-    .map((line) =>
-      line
-        .replace(/^([-*•]|\d+[.)])\s+/, "")
-        .replace(/\*\*/g, "")
-        .trim(),
-    )
-    .filter((line) => line.length >= 8 && !line.endsWith(":"))
-    .slice(0, 5);
+    .filter(Boolean);
+
+  // a line starting with a year ("2024 ...") is not a numbered bullet
+  const marked = lines.filter((line) => MARKER.test(line) && !/^\d{4}\b/.test(line));
+  const picked = (marked.length > 0 ? marked : lines).map(tidy);
+
+  return picked.filter((line) => line.length >= 12 && !isChatter(line)).slice(0, 5);
 }
 
 async function generateOne(input: ResumeInput, section: ResumeSection): Promise<ResumeBlock> {
@@ -105,8 +125,8 @@ async function generateOne(input: ResumeInput, section: ResumeSection): Promise<
   let bullets: string[] = [];
   const text = await completeWithFallback(buildBlockPrompt(input, section), {
     feature: "RESUME",
+    timeoutMs: MODEL_TIMEOUT_MS,
     totalTimeoutMs: TOTAL_TIMEOUT_MS,
-    maxTokens: MAX_TOKENS,
     validate: (reply) => {
       bullets = parseBullets(reply);
       if (bullets.length === 0) throw new Error("No bullet points in the reply");
@@ -114,6 +134,8 @@ async function generateOne(input: ResumeInput, section: ResumeSection): Promise<
   });
 
   if (text == null) {
+    // why each model failed is logged by completeWithFallback
+    console.warn(`No resume bullets for ${block.key} (${block.heading}).`);
     return { ...block, bullets: [], error: "Couldn't generate bullet points. Try again." };
   }
   return { ...block, bullets };

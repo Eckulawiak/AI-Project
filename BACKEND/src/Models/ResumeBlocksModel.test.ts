@@ -65,3 +65,20 @@ Hope this helps!`;
     "Wrote integration tests for every endpoint",
   ]);
 });
+
+test("bullets with other markers, or none, are still read", () => {
+  assert.deepEqual(
+    parseBullets("• Designed a relational schema for course data\n– Wrote SQL queries to report on enrollment"),
+    ["Designed a relational schema for course data", "Wrote SQL queries to report on enrollment"],
+  );
+  assert.deepEqual(
+    parseBullets(
+      "Sure! Here are the bullet points:\nDesigned a relational schema for course data\nWrote SQL queries to report on enrollment",
+    ),
+    ["Designed a relational schema for course data", "Wrote SQL queries to report on enrollment"],
+  );
+  assert.deepEqual(parseBullets("```\n1) Built REST endpoints in Express\n2) Tested every API route\n```"), [
+    "Built REST endpoints in Express",
+    "Tested every API route",
+  ]);
+});
