@@ -1,0 +1,200 @@
+/* Projects and career goal inputs on the Student Dashboard (REQ-RES-1).
+   Builds on the class picker styles in studentDashboard.css. */
+
+.ri-hint {
+  margin: -0.2rem 0 0.6rem;
+  padding: 0 0.4rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+  text-align: left;
+}
+
+/* The card is a frame; the select button fills it, with Edit and
+   Delete in the top-right corner. */
+.ri-project {
+  position: relative;
+  padding: 0;
+  cursor: default;
+}
+
+.ri-project-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 66px;
+  padding: 0.6rem 4.4rem 0.6rem 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ri-project-toggle:focus-visible,
+.ri-add-box:focus-visible,
+.ri-icon-btn:focus-visible,
+.ri-link-btn:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+.ri-project-title {
+  overflow-wrap: anywhere;
+}
+
+.ri-project-actions {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: flex;
+  gap: 0.1rem;
+}
+
+.ri-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.ri-icon-btn:hover {
+  background: rgba(19, 29, 67, 0.08);
+  color: #131d43;
+}
+
+.ri-add-box {
+  min-height: 70px;
+  border: 2px dashed #9ca3af;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #131d43;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ri-add-box:hover {
+  border-color: #f59e0b;
+  background: rgba(253, 185, 19, 0.1);
+}
+
+.ri-form {
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin-top: 0.9rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+  text-align: left;
+}
+
+.ri-form-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #131d43;
+}
+
+.ri-label {
+  margin: 0.55rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #131d43;
+}
+
+.ri-optional {
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.ri-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.ri-input:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(253, 185, 19, 0.3);
+}
+
+.ri-textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.ri-count {
+  align-self: flex-end;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.ri-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #b91c1c;
+  text-align: left;
+}
+
+.ri-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.ri-save {
+  padding: 0.45rem 1.5rem;
+}
+
+.ri-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 480px;
+  margin-bottom: 0.45rem;
+}
+
+.ri-link-btn {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.4rem;
+  border: none;
+  background: none;
+  color: #131d43;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ri-link-btn:hover {
+  color: #b45309;
+  text-decoration: underline;
+}
+
