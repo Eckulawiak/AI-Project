@@ -23,6 +23,11 @@ import {
 
 export const facultyCoursesRouter = Router();
 
+// Everything under /api/faculty is for faculty and admins. Server.ts only
+// checks for a login, so without this a student could list, create and
+// claim courses.
+facultyCoursesRouter.use(RequireFaculty);
+
 // --- Data Fetching Routes ---
 facultyCoursesRouter.get("/courses", getCourses);
 facultyCoursesRouter.get("/unassigned-courses", fetchUnassignedCourses);

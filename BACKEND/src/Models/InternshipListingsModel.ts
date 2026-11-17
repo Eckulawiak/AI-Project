@@ -5,7 +5,7 @@ import { supabase } from "../Database/supabaseClient.js";
 // student. Results are cached per goal so most students share one lookup.
 //
 // Providers (each is skipped when its keys are not set):
-//   Adzuna      ADZUNA_APP_ID, ADZUNA_APP_KEY   https://developer.adzuna.com
+//   Jooble      JOOBLE_API_KEY                  https://jooble.org/api/about
 //   USAJobs     USAJOBS_API_KEY, USAJOBS_EMAIL  https://developer.usajobs.gov
 
 export type InternshipListing = {
@@ -13,7 +13,7 @@ export type InternshipListing = {
   company: string;
   location: string;
   url: string;
-  source: "Adzuna" | "USAJobs";
+  source: "Jooble" | "USAJobs";
   postedAt: string | null;
 };
 
@@ -65,30 +65,32 @@ async function getJson(url: string, headers: Record<string, string> = {}) {
 // Providers
 // ---------------------------------------------------------------------
 
-async function fromAdzuna(goal: string): Promise<InternshipListing[] | null> {
-  const id = process.env.ADZUNA_APP_ID;
-  const key = process.env.ADZUNA_APP_KEY;
-  if (!id || !key) return null;
+async function fromJooble(goal: string): Promise<InternshipListing[] | null> {
+  const key = process.env.JOOBLE_API_KEY;
+  if (!key) return null;
 
-  const params = new URLSearchParams({
-    app_id: id,
-    app_key: key,
-    what: goal,
-    what_or: "intern internship",
-    results_per_page: String(PER_SOURCE * 2),
-    max_days_old: "60",
-    sort_by: "date",
+  const res = await fetch(`https://jooble.org/api/${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      keywords: /intern/i.test(goal) ? goal : `${goal} intern`,
+      location: "United States",
+      page: "1",
+      ResultOnPage: String(PER_SOURCE * 2),
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  const data = await getJson(`https://api.adzuna.com/v1/api/jobs/us/search/1?${params}`);
-  return ((data?.results ?? []) as any[])
-    .filter((r) => /intern/i.test(`${r?.title} ${r?.description}`))
+  if (!res.ok) throw new Error(`HTTP ${res.status} from jooble.org`);
+  const data = (await res.json()) as any;
+  return ((data?.jobs ?? []) as any[])
+    .filter((r) => /intern/i.test(`${r?.title} ${r?.type} ${r?.snippet}`))
     .map((r) => ({
       title: text(r?.title),
-      company: text(r?.company?.display_name),
-      location: text(r?.location?.display_name),
-      url: httpsUrl(r?.redirect_url) ?? "",
-      source: "Adzuna" as const,
-      postedAt: typeof r?.created === "string" ? r.created : null,
+      company: text(r?.company),
+      location: text(r?.location),
+      url: httpsUrl(r?.link) ?? "",
+      source: "Jooble" as const,
+      postedAt: typeof r?.updated === "string" ? r.updated : null,
     }));
 }
 
@@ -122,7 +124,7 @@ async function fromUsaJobs(goal: string): Promise<InternshipListing[] | null> {
 }
 
 const PROVIDERS = [
-  { name: "Adzuna", fetch: fromAdzuna },
+  { name: "Jooble", fetch: fromJooble },
   { name: "USAJobs", fetch: fromUsaJobs },
 ];
 

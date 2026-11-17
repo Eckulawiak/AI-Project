@@ -34,7 +34,7 @@ app.use(express.json());
 
 // --- Public Routes ---
 app.use("/api/auth", authRouter);
-app.use("/api/history", historyRouter);
+app.use("/api/history", RequireStudent, historyRouter);
 app.use("/courses", publicCourseRouter);
 
 // --- Protected Routes ---
