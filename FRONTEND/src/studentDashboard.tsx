@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
 import { apiClient } from "./services/apiClient";
 import { useSchools } from "./hooks/useSchools";
-import ResumeProjects from "./components/ResumeProjects";
 import CareerGoalsInput from "./components/CareerGoalsInput";
 import {
   generateResumeContent,
@@ -38,9 +38,6 @@ const StudentDashboard: React.FC = () => {
   const [bullets, setBullets] = useState<string[]>([]);
   // which course or project each header in the AI output belongs to
   const [sections, setSections] = useState<ResumeSection[]>([]);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(
-    new Set(),
-  );
   const [careerGoals, setCareerGoals] = useState<string[]>([""]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -48,8 +45,9 @@ const StudentDashboard: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [generationMode, setGenerationMode] =
-    useState<GenerationMode>("skills");
+  // Resume bullet points have their own page (/resume); the dashboard
+  // writes interview talking points.
+  const generationMode: GenerationMode = "talkingPoints";
 
   const [majorClasses, setMajorClasses] = useState<ClassOption[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState<boolean>(false);
@@ -195,31 +193,9 @@ const StudentDashboard: React.FC = () => {
     (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
   ).length;
 
-  const toggleProject = (id: number) => {
-    setSelectedProjectIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setBullets([]);
-  };
-
-  const removeProjectFromSelection = (id: number) => {
-    setSelectedProjectIds((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    setBullets([]);
-  };
-
-  const generateWithAI = async (
-    courseIds: number[],
-    projectIds: number[],
-    mode: GenerationMode,
-  ) => {
+  // Projects are picked on the Resume page; talking points here come from
+  // classes only.
+  const generateWithAI = async (courseIds: number[], mode: GenerationMode) => {
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -227,7 +203,7 @@ const StudentDashboard: React.FC = () => {
       const result = await generateResumeContent({
         mode,
         courseIds,
-        projectIds,
+        projectIds: [],
         careerGoals: careerGoals.map((g) => g.trim()).filter(Boolean),
       });
 
@@ -260,33 +236,24 @@ const StudentDashboard: React.FC = () => {
     const courseIds = availableClasses
       .map((course) => Number(getResolvedId(course)))
       .filter((id) => Number.isInteger(id) && id > 0);
-    const projectIds = [...selectedProjectIds];
 
-    if (courseIds.length === 0 && projectIds.length === 0) {
-      if (availableClasses.length === 0) {
-        setBullets([
-          `No classes are listed for ${major} yet. Add a project to generate.`,
-        ]);
-        return;
-      }
+    if (courseIds.length === 0) {
       setBullets([
-        generationMode === "skills"
-          ? "Select at least one class or project to generate bullet points."
-          : "Select at least one class or project to generate talking points.",
+        availableClasses.length === 0
+          ? `No classes are listed for ${major} yet.`
+          : "Select at least one class to generate talking points.",
       ]);
       return;
     }
 
-    generateWithAI(courseIds, projectIds, generationMode);
+    generateWithAI(courseIds, generationMode);
   };
 
   const handleCopy = () => {
     if (bullets.length === 0) return;
     navigator.clipboard.writeText(bullets.join("\n"));
     alert(
-      generationMode === "skills"
-        ? "Bullet points copied to clipboard!"
-        : "Talking points copied to clipboard!",
+      "Talking points copied to clipboard!",
     );
   };
 
@@ -298,9 +265,7 @@ const StudentDashboard: React.FC = () => {
     const a = document.createElement("a");
     a.href = url;
     a.download =
-      generationMode === "skills"
-        ? "generated-bullet-points.txt"
-        : "generated-talking-points.txt";
+      "generated-talking-points.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -591,13 +556,6 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
 
-            <ResumeProjects
-              selectedIds={selectedProjectIds}
-              onToggle={toggleProject}
-              onAdded={(id) => toggleProject(id)}
-              onDeleted={removeProjectFromSelection}
-            />
-
             <CareerGoalsInput
               goals={careerGoals}
               onChange={(goals) => {
@@ -625,41 +583,10 @@ const StudentDashboard: React.FC = () => {
                   flexWrap: "wrap",
                 }}
               >
-                <div className="generation-toggle-wrap">
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "skills" ? "active" : ""
-                    }`}
-                  >
-                    Skill Generation
-                  </span>
-
-                  <button
-                    type="button"
-                    className={`generation-toggle ${
-                      generationMode === "talkingPoints" ? "is-on" : ""
-                    }`}
-                    onClick={() => {
-                      setGenerationMode((prev) =>
-                        prev === "skills" ? "talkingPoints" : "skills",
-                      );
-                      setBullets([]);
-                      setErrorMsg(null);
-                    }}
-                  >
-                    <span className="generation-toggle-track">
-                      <span className="generation-toggle-thumb" />
-                    </span>
-                  </button>
-
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "talkingPoints" ? "active" : ""
-                    }`}
-                  >
-                    Talking Points
-                  </span>
-                </div>
+                <Link to="/resume" className="dash-resume-link">
+                  <i className="bi bi-file-earmark-text" aria-hidden="true" /> Writing
+                  resume bullet points? Open the Resume Builder
+                </Link>
               </div>
 
               <button
@@ -670,9 +597,7 @@ const StudentDashboard: React.FC = () => {
               >
                 {isLoading
                   ? "Generating..."
-                  : generationMode === "skills"
-                    ? "Generate Skills with AI"
-                    : "Generate Talking Points with AI"}
+                  : "Generate Talking Points with AI"}
               </button>
             </div>
           </div>
@@ -682,9 +607,7 @@ const StudentDashboard: React.FC = () => {
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">
-                {generationMode === "skills"
-                  ? "Generated Bullet Points:"
-                  : "Generated Talking Points:"}
+                {"Generated Talking Points:"}
               </h2>
 
               <div
@@ -732,17 +655,15 @@ const StudentDashboard: React.FC = () => {
                 <div className="loading-container">
                   <div className="spinner"></div>
                   <p>
-                    {generationMode === "skills"
-                      ? "Generating bullet points with AI..."
-                      : "Generating talking points with AI..."}
+                    {"Generating talking points with AI..."}
                   </p>
                 </div>
               ) : errorMsg ? (
                 <p className="error-text">{errorMsg}</p>
               ) : bullets.length === 0 ? (
                 <p className="placeholder-text">
-                  Select classes or projects and click "Generate" to see your
-                  AI-generated content.
+                  Select classes and click "Generate" to see your AI-generated
+                  talking points.
                 </p>
               ) : (
                 <ul>
