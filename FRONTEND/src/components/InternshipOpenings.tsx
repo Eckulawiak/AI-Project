@@ -65,7 +65,15 @@ const InternshipOpenings: React.FC = () => {
           <ul className="rm-openings">
             {data.listings.map((l) => (
               <li key={l.url}>
-                <a href={l.url} target="_blank" rel="noopener noreferrer">
+                {/* Jooble's job pages can block visits that arrive with no
+                    referrer (Cloudflare), so say which site sent them. Only
+                    the origin is sent, never the roadmap's path. */}
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener"
+                  referrerPolicy="origin"
+                >
                   {l.title} <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
                 </a>
                 <span className="rm-openings-meta">
